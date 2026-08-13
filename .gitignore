@@ -1,0 +1,28 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+
+# Local Codex/agent workspace metadata
+.agents/
+.codex/
+
+# Task Stamps user data. The app normally stores this outside the repository,
+# but these rules also protect runs that set TASK_STAMPS_DATA_DIR locally.
+app_data/
+.local_data/
+assets/
+database/
+backups/
+logs/
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+task_stamps_export_*.json
