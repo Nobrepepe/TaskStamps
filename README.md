@@ -153,6 +153,41 @@ For development or a portable setup, point the app anywhere:
 TASK_STAMPS_DATA_DIR=./.local_data task-stamps
 ```
 
+## World Hub content
+
+Task Stamps can act as a consumer of [World Hub](../WorldHub) publications
+(Package Protocol 1, Application Contract 1). The authoritative contract this
+app supports lives at `worldhub/application-contract.json`.
+
+- **Install a ZIP** — Settings → World Hub content → *Install publication
+  ZIP…*. The package is extracted to a staging area, fully validated (safe
+  paths, manifest, embedded contract, every checksum, all references, then
+  Task Stamps' own rules: 15 stamps and a portrait per character), previewed,
+  and only then activated.
+- **Link a production folder** — point at the World Hub folder containing
+  `current.json`, then use *Check for update* whenever you republish. The
+  publication is copied into this app's own data directory
+  (`worldhub-content/`), so everything keeps working when the Hub library or
+  drive is unavailable.
+- **Activation is failure-safe** — the database import runs in one
+  transaction, the previous publication is retained for *Roll back*, and a
+  rejected or corrupt package changes nothing.
+- **Hub mode** — while a publication is active the Worlds/Characters library
+  is read-only; updates arrive through Settings. Legacy in-app authoring
+  returns if you never install a publication.
+- **What stays yours** — tasks, schedules, assignments, streaks, completions,
+  board placements, points, vices, and settings are app-owned and survive
+  content updates, retirements, failed imports, and rollback. Hub art is
+  imported through the immutable asset-version system, so historical boards
+  keep rendering the exact bytes they were completed with. Characters that
+  leave a publication are archived (never deleted) and active tasks are
+  reassigned using the existing safe replacement behavior.
+- **Provenance** — every install writes a receipt
+  (`worldhub-content/receipts/<publicationId>.json`) recording the source
+  library, production, publication, contract version, and checksums; backups
+  include the receipts and active pointer but not the recoverable package
+  caches.
+
 ## Backup and restore
 
 - **Settings → Create backup** writes a single `.zip` into `backups/`

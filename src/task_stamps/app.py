@@ -243,13 +243,21 @@ class TaskStampsApp:
             allow_multiple=False, allowed_extensions=allowed_extensions
         )
 
+    def pick_directory(self, callback: Callable[[str], None]) -> None:
+        self._picker_callback = callback
+        self.file_picker.get_directory_path()
+
     def _on_file_picked(self, event: ft.FilePickerResultEvent) -> None:
         callback = self._picker_callback
         self._picker_callback = None
-        if callback and event.files:
+        if callback is None:
+            return
+        if event.files:
             path = event.files[0].path
             if path:
                 callback(path)
+        elif event.path:
+            callback(event.path)
 
     def notify(self, message: str) -> None:
         self.page.open(ft.SnackBar(content=ft.Text(message), duration=5000))

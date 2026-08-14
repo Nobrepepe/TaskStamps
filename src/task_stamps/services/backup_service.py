@@ -70,6 +70,20 @@ class BackupService:
                             archive.write(
                                 file, file.relative_to(self.config.data_dir).as_posix()
                             )
+                    # World Hub provenance (pointer + receipts) is user-relevant
+                    # metadata; installed publication caches are recoverable
+                    # from the Hub and deliberately excluded.
+                    worldhub_dir = self.config.data_dir / "worldhub-content"
+                    for name in ["current.json", *(
+                        f"receipts/{p.name}" for p in sorted((worldhub_dir / "receipts").glob("*.json"))
+                        if (worldhub_dir / "receipts").is_dir()
+                    )]:
+                        candidate = worldhub_dir / name
+                        if candidate.is_file():
+                            archive.write(
+                                candidate,
+                                candidate.relative_to(self.config.data_dir).as_posix(),
+                            )
         except OSError as error:
             logger.exception("Backup failed")
             raise BackupError("Creating the backup archive failed.") from error

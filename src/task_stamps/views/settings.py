@@ -17,6 +17,149 @@ _BACKUP_EXTS = ["zip"]
 
 
 class SettingsView(View):
+    def _worldhub_card(self) -> ft.Control:
+        """World Hub content: install, link, preview, activate, roll back."""
+        container = self.app.container
+        hub = container.worldhub
+        status = hub.status()
+
+        if status["hub_mode"]:
+            receipt = status["receipt"] or {}
+            summary = (
+                f"Hub mode — “{receipt.get('productionName', 'unknown production')}” "
+                f"revision {receipt.get('productionRevision', '?')}, "
+                f"publication {str(status['publication_id'])[:8]}…, "
+                f"imported {str(receipt.get('importedAt', ''))[:10]}."
+            )
+        else:
+            summary = (
+                "Legacy mode — content is authored in this app. Install a World Hub "
+                "publication to make World Hub the content source."
+            )
+        linked = status["linked_folder"] or "No production folder linked."
+
+        def show_preview(staged) -> None:
+            preview = hub.preview(staged)
+            lines: list[str] = []
+            if preview.already_active:
+                lines.append("This publication is already active.")
+            if preview.added_worlds:
+                lines.append("Worlds added: " + ", ".join(preview.added_worlds))
+            if preview.updated_worlds:
+                lines.append("Worlds updated: " + ", ".join(preview.updated_worlds))
+            if preview.added_characters:
+                lines.append("Characters added: " + ", ".join(preview.added_characters))
+            if preview.updated_characters:
+                lines.append("Characters updated: " + ", ".join(preview.updated_characters))
+            if preview.retired_characters:
+                lines.append(
+                    "Characters retiring (kept for history): "
+                    + ", ".join(preview.retired_characters)
+                )
+            if preview.affected_assignments:
+                lines.append(
+                    "Active tasks will be reassigned from: "
+                    + ", ".join(preview.affected_assignments)
+                )
+            if preview.changed_assets:
+                lines.append(f"{preview.changed_assets} artwork file(s) changed.")
+            if not lines:
+                lines.append("No visible content changes.")
+
+            def activate(_) -> None:
+                try:
+                    hub.activate(staged)
+                except TaskStampsError as error:
+                    self.app.error(error)
+                    return
+                self.page.close(dialog)
+                self.app.notify("The publication is now active.")
+                self.refresh()
+
+            def cancel(_) -> None:
+                staged.cleanup()
+                self.page.close(dialog)
+
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text(f"Activate “{preview.production_name}”?"),
+                content=ft.Column(
+                    [ft.Text(line, size=13) for line in lines]
+                    + [ft.Text(
+                        "Tasks, streaks, completions, boards, and points are never touched. "
+                        "If anything fails, the current content stays active.",
+                        size=12, color=MUTED_TEXT,
+                    )],
+                    tight=True, spacing=6, width=460,
+                ),
+                actions=[
+                    ft.TextButton("Activate", on_click=activate),
+                    ft.TextButton("Cancel", on_click=cancel),
+                ],
+            )
+            self.page.open(dialog)
+
+        def install_zip(_) -> None:
+            def handle(path: str) -> None:
+                try:
+                    staged = hub.stage_zip(Path(path))
+                except Exception as error:  # PackageError carries a user message
+                    self.app.error(error)
+                    return
+                show_preview(staged)
+
+            self.app.pick_file(["zip"], handle)
+
+        def link_folder(_) -> None:
+            def handle(path: str) -> None:
+                try:
+                    hub.link_folder(Path(path))
+                except Exception as error:
+                    self.app.error(error)
+                    return
+                self.app.notify("Production folder linked.")
+                self.refresh()
+
+            self.app.pick_directory(handle)
+
+        def check_update(_) -> None:
+            try:
+                staged = hub.stage_linked_folder()
+            except Exception as error:
+                self.app.error(error)
+                return
+            show_preview(staged)
+
+        def roll_back(_) -> None:
+            try:
+                hub.rollback()
+            except Exception as error:
+                self.app.error(error)
+                return
+            self.app.notify("Rolled back to the previous publication.")
+            self.refresh()
+
+        actions = [
+            ft.FilledTonalButton("Install publication ZIP…", on_click=install_zip),
+            ft.FilledTonalButton("Link production folder…", on_click=link_folder),
+        ]
+        if status["linked_folder"]:
+            actions.append(ft.FilledTonalButton("Check for update", on_click=check_update))
+        if status["previous_publication_id"]:
+            actions.append(ft.TextButton("Roll back", on_click=roll_back))
+
+        return card(
+            ft.Column(
+                [
+                    section_title("World Hub content"),
+                    ft.Text(summary, size=13),
+                    ft.Text(f"Linked folder: {linked}", size=12, color=MUTED_TEXT, selectable=True),
+                    ft.Row(actions, spacing=10, wrap=True),
+                ],
+                spacing=10,
+            )
+        )
+
     def build(self) -> ft.Control:
         self.body = ft.Column(
             spacing=14, scroll=ft.ScrollMode.AUTO, expand=True
@@ -183,6 +326,7 @@ class SettingsView(View):
             self.app.notify(f"Removed {removed} unreferenced asset file(s).")
 
         self.body.controls = [
+            self._worldhub_card(),
             card(
                 ft.Column(
                     [

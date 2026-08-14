@@ -28,6 +28,7 @@ from task_stamps.services.streak_service import StreakService
 from task_stamps.services.stats_service import StatsService
 from task_stamps.services.task_service import TaskService
 from task_stamps.services.vice_service import ViceService
+from task_stamps.worldhub.consumer_service import WorldHubService
 from task_stamps.utilities.audio import AudioPlayer
 from task_stamps.utilities.clock import Clock, SystemClock
 from task_stamps.utilities.logging_setup import setup_logging
@@ -108,6 +109,17 @@ class AppContainer:
             self.vices,
         )
         self.backup_service = BackupService(config, self.db, clock)
+        self.worldhub = WorldHubService(
+            config,
+            self.db,
+            clock,
+            self.worlds,
+            self.characters,
+            self.assets,
+            self.asset_service,
+            self.library_service,
+            self.assignments,
+        )
         self.vice_service = ViceService(self.db, self.vices)
         self.audio = AudioPlayer()
 

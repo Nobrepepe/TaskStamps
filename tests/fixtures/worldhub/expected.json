@@ -1,18 +1,18 @@
 {
   "appType": "task-stamps.stamp-set",
-  "contractId": "f7c2c2fa-8443-4ca4-a27e-c0ca98261d65",
+  "contractId": "a5d53c5d-40c9-40db-ba29-881e82a370bb",
   "contractVersion": 1,
-  "libraryId": "d9aff648-163b-4ea6-848e-4f67dd52b742",
-  "productionId": "ba188043-174c-4608-ad8b-ea340b235a1e",
-  "publicationV1": "13f7a2ae-eb52-47ea-abcd-187b6f6f218d",
-  "publicationV2": "33e35f3f-a0ca-4d11-a364-2fc72283a6c7",
-  "worldId": "bb733994-1c93-4c92-81df-3a287268d4f4",
+  "libraryId": "6b66c8db-f6d6-43f6-8c19-c2dfca4780ab",
+  "productionId": "b309e95b-406a-426d-b6bd-3554d7b8d2d2",
+  "publicationV1": "66e8ab28-eef6-4921-ba40-0b7641f93612",
+  "publicationV2": "cbdb88f5-c673-4c29-b992-8576de0dc756",
+  "worldId": "5a90f216-0343-4b43-99cc-30adf8336d3a",
   "characterIds": [
-    "b471a029-991f-4607-a03e-3b6e2144b25b",
-    "b733bf93-50f5-4373-b4e4-9eb3841f98c1"
+    "df17ea74-2b44-4216-b71a-80a5fcd6e3ed",
+    "9d65f64d-ef10-4498-9fbf-4f2f086fd31e"
   ],
-  "renamedCharacterId": "b471a029-991f-4607-a03e-3b6e2144b25b",
+  "renamedCharacterId": "df17ea74-2b44-4216-b71a-80a5fcd6e3ed",
   "retiredCharacterIds": [
-    "b733bf93-50f5-4373-b4e4-9eb3841f98c1"
+    "9d65f64d-ef10-4498-9fbf-4f2f086fd31e"
   ]
 }

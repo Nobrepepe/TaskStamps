@@ -50,14 +50,24 @@ class WorldsView(View):
 
     def _render_worlds(self) -> None:
         container = self.app.container
+        hub_mode = container.worldhub.hub_mode()
+        header_action: ft.Control
+        if hub_mode:
+            header_action = ft.Text(
+                "Content is managed by World Hub — the library is read-only. "
+                "Updates arrive through Settings → World Hub content.",
+                size=12, color=MUTED_TEXT,
+            )
+        else:
+            header_action = ft.FilledButton(
+                "New world", icon=ft.Icons.ADD,
+                on_click=lambda _: self._open_world_editor(None),
+            )
         self.header_host.content = ft.Row(
             [
                 ft.Text("Worlds", size=20, weight=ft.FontWeight.W_600),
                 ft.Container(expand=True),
-                ft.FilledButton(
-                    "New world", icon=ft.Icons.ADD,
-                    on_click=lambda _: self._open_world_editor(None),
-                ),
+                header_action,
             ]
         )
         worlds = container.worlds.list()
@@ -105,6 +115,7 @@ class WorldsView(View):
                         ft.TextButton(
                             "Open", on_click=lambda _, w=world: self._open_gallery(w.id)
                         ),
+                    ] + ([] if container.worldhub.hub_mode() else [
                         ft.TextButton(
                             "Edit", on_click=lambda _, w=world: self._open_world_editor(w)
                         ),
@@ -113,7 +124,7 @@ class WorldsView(View):
                             on_click=lambda _, w=world: self._archive_world(w),
                             style=ft.ButtonStyle(color="#A65D57"),
                         ),
-                    ],
+                    ]),
                     spacing=0,
                 ),
             ],
@@ -237,7 +248,9 @@ class WorldsView(View):
                 ),
                 ft.Text(world.name, size=20, weight=ft.FontWeight.W_600),
                 ft.Container(expand=True),
-                ft.FilledButton(
+                ft.Text(
+                    "Managed by World Hub — read-only.", size=12, color=MUTED_TEXT,
+                ) if container.worldhub.hub_mode() else ft.FilledButton(
                     "New character",
                     icon=ft.Icons.ADD,
                     on_click=lambda _: self._create_character(world_id),
@@ -505,14 +518,19 @@ class WorldsView(View):
 
             do_archive(False)
 
-        dialog.actions = [
-            ft.TextButton("Archive", on_click=archive, style=ft.ButtonStyle(color="#A65D57")),
-            ft.TextButton(
-                "Edit",
-                on_click=lambda _: (self.page.close(dialog), self._open_editor(character_id)),
-            ),
-            ft.TextButton("Close", on_click=lambda _: self.page.close(dialog)),
-        ]
+        if container.worldhub.hub_mode():
+            dialog.actions = [
+                ft.TextButton("Close", on_click=lambda _: self.page.close(dialog)),
+            ]
+        else:
+            dialog.actions = [
+                ft.TextButton("Archive", on_click=archive, style=ft.ButtonStyle(color="#A65D57")),
+                ft.TextButton(
+                    "Edit",
+                    on_click=lambda _: (self.page.close(dialog), self._open_editor(character_id)),
+                ),
+                ft.TextButton("Close", on_click=lambda _: self.page.close(dialog)),
+            ]
         self.page.open(dialog)
 
     def _open_profile_stamp_dialog(
