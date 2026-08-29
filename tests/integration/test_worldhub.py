@@ -9,10 +9,34 @@ from pathlib import Path
 import pytest
 
 from task_stamps.domain.enums import CharacterStatus, TaskStatus
-from task_stamps.worldhub.package_reader import PackageError
+from worldhub_kit import PackageError
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "worldhub"
 EXPECTED = json.loads((FIXTURES / "expected.json").read_text())
+
+
+def test_application_contract_advertises_current_asset_recipes_and_optional_boss_media():
+    contract_path = Path(__file__).resolve().parents[2] / "worldhub" / "application-contract.json"
+    contract = json.loads(contract_path.read_text())
+    # contractFormatVersion is the document-format version, and the only
+    # contract number a consumer gates on. The Hub's per-edit revision counter
+    # travels separately, as manifest.contract.revision.
+    assert contract["contractFormatVersion"] == 1
+    assert 2 in contract["supportedProtocolVersions"]
+    assert contract["requiredRecipes"] == [
+        "portrait_3x4", "stamp_4x3", "thumbnail_square", "tile_16x9"
+    ]
+    characters = next(
+        selection for selection in contract["entitySelections"]
+        if selection["id"] == "stamp_characters"
+    )
+    sets = {asset_set["id"]: asset_set for asset_set in characters["assetSets"]}
+    assert sets["portrait"]["recipes"] == ["portrait_3x4", "thumbnail_square"]
+    assert sets["stamps"]["recipes"] == ["stamp_4x3"]
+    assert sets["boss_image"]["kinds"] == ["image"]
+    assert sets["boss_image"]["min"] == 0 and sets["boss_image"]["max"] == 1
+    assert sets["boss_sound"]["kinds"] == ["audio"]
+    assert sets["boss_sound"]["min"] == 0 and sets["boss_sound"]["max"] == 1
 
 
 def install(container, name: str):
@@ -149,7 +173,7 @@ class TestRejection:
         ("unlisted-file.zip", "unlisted"),
         ("missing-asset.zip", "missing"),
         ("wrong-apptype.zip", "not for this app"),
-        ("unsupported-protocol.zip", "newer World Hub protocol"),
+        ("unsupported-protocol.zip", "protocol this app does not understand"),
         ("traversal.zip", "unsafe|not a World Hub package|missing"),
     ])
     def test_bad_packages_change_nothing(self, container, fixture, fragment):
@@ -196,3 +220,69 @@ class TestLinkedFolder:
         shutil.rmtree(production_dir)
         assert container.worldhub.status()["hub_mode"] is True
         assert (container.worldhub.publications_dir / EXPECTED["publicationV2"]).is_dir()
+
+
+def _repackage_manifest(tmp_path, mutate):
+    """Extract valid-v1, rewrite its manifest, and keep checksums honest."""
+    import hashlib
+
+    from worldhub_kit import extract_zip_safely
+
+    root = tmp_path / "package"
+    extract_zip_safely(FIXTURES / "valid-v1.zip", root)
+
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text("utf-8"))
+    mutate(manifest)
+    manifest_bytes = (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
+    manifest_path.write_bytes(manifest_bytes)
+
+    checksums_path = root / "checksums.json"
+    checksums = json.loads(checksums_path.read_text("utf-8"))
+    checksums["manifest.json"] = hashlib.sha256(manifest_bytes).hexdigest()
+    checksums_path.write_text(json.dumps(checksums, indent=2) + "\n", encoding="utf-8")
+    return root
+
+
+def test_a_high_contract_revision_still_loads(tmp_path):
+    """The Hub's contract revision counter climbs with every edit over there.
+
+    It is a receipt, not a compatibility signal: gating on it refused a real
+    publication in a sibling app once the contract reached its fourth edit.
+    Only the contract's *format* version decides whether this app can read a
+    package.
+    """
+    from task_stamps.worldhub.consumer_service import APP_TYPE
+    from worldhub_kit import load_package
+
+    def climb(manifest):
+        manifest["contract"]["revision"] = 40
+
+    package = load_package(_repackage_manifest(tmp_path, climb), APP_TYPE)
+    assert package.manifest["contract"]["revision"] == 40
+
+
+def test_the_protocol_1_spelling_of_the_revision_still_reads(tmp_path):
+    """Packages published before the rename carried it as `contract.version`."""
+    from task_stamps.worldhub.consumer_service import APP_TYPE
+    from worldhub_kit import load_package
+
+    def downgrade(manifest):
+        manifest["protocolVersion"] = 1
+        manifest["contract"] = {"id": manifest["contract"]["id"], "version": 7}
+        manifest.pop("vocabularyVersion", None)
+
+    package = load_package(_repackage_manifest(tmp_path, downgrade), APP_TYPE)
+    assert package.manifest["contract"]["revision"] == 7, "the old spelling is presented under the current name"
+    assert package.manifest["vocabularyVersion"] == 1, "a package without one predates vocabulary versioning"
+
+
+def test_a_nonsense_contract_revision_is_still_refused(tmp_path):
+    from task_stamps.worldhub.consumer_service import APP_TYPE
+    from worldhub_kit import load_package
+
+    def spoil(manifest):
+        manifest["contract"]["revision"] = "not-a-number"
+
+    with pytest.raises(PackageError, match="invalid contract revision"):
+        load_package(_repackage_manifest(tmp_path, spoil), APP_TYPE)

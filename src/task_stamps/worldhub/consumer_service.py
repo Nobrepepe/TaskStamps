@@ -19,7 +19,7 @@ from pathlib import Path
 
 from task_stamps.domain.enums import AssetType, CharacterStatus
 from task_stamps.utilities.logging_setup import get_logger
-from task_stamps.worldhub.package_reader import (
+from worldhub_kit import (
     PackageError,
     PackageInfo,
     extract_zip_safely,
@@ -205,6 +205,10 @@ class WorldHubService:
                 )
             if not asset_sets.get(f"portrait:{character_id}"):
                 raise PackageError("A character is missing its portrait.")
+            if len(asset_sets.get(f"boss_image:{character_id}") or []) > 1:
+                raise PackageError("A character has more than one Boss image.")
+            if len(asset_sets.get(f"boss_sound:{character_id}") or []) > 1:
+                raise PackageError("A character has more than one Boss defeat sound.")
             for sound in asset_sets.get(f"stamp_sounds:{character_id}") or []:
                 number = (sound.get("values") or {}).get("stamp_number")
                 if not isinstance(number, int) or not 1 <= number <= 15:
@@ -329,7 +333,7 @@ class WorldHubService:
             if cover_items:
                 version = self._import_hub_asset(
                     package, cover_items[0]["assetId"], AssetType.WORLD_COVER,
-                    ["landscape_16x9", "thumbnail_square"],
+                    package.recipes_for("world_cover"),
                 )
                 self.worlds.update(local_id, cover_asset_version_id=version.id)
 
@@ -348,9 +352,26 @@ class WorldHubService:
             if portrait_items:
                 version = self._import_hub_asset(
                     package, portrait_items[0]["assetId"], AssetType.PORTRAIT,
-                    ["square", "thumbnail_square"],
+                    package.recipes_for("portrait"),
                 )
                 self.characters.update(local_id, portrait_asset_version_id=version.id)
+
+            boss_items = asset_sets.get(f"boss_image:{hub_character_id}") or []
+            if boss_items:
+                version = self._import_hub_asset(
+                    package,
+                    boss_items[0]["assetId"],
+                    AssetType.BOSS_IMAGE,
+                    package.recipes_for("boss_image"),
+                )
+                self.characters.update(local_id, boss_image_asset_version_id=version.id)
+
+            boss_sound_items = asset_sets.get(f"boss_sound:{hub_character_id}") or []
+            if boss_sound_items:
+                version = self._import_hub_asset(
+                    package, boss_sound_items[0]["assetId"], AssetType.SOUND, ["original"]
+                )
+                self.characters.update(local_id, boss_sound_asset_version_id=version.id)
 
             sound_items = asset_sets.get(f"default_sound:{hub_character_id}") or []
             if sound_items:
@@ -362,7 +383,10 @@ class WorldHubService:
             stamps = asset_sets.get(f"stamps:{hub_character_id}") or []
             for index, item in enumerate(stamps, start=1):
                 version = self._import_hub_asset(
-                    package, item["assetId"], AssetType.STAMP_IMAGE, ["square", "thumbnail_square"],
+                    package,
+                    item["assetId"],
+                    AssetType.STAMP_IMAGE,
+                    package.recipes_for("stamps"),
                 )
                 self.characters.set_stamp_image(local_id, index, version.id)
 
@@ -465,7 +489,9 @@ class WorldHubService:
             "publicationId": manifest["publicationId"],
             "applicationType": manifest["applicationType"],
             "contractId": manifest["contract"]["id"],
-            "contractVersion": manifest["contract"]["version"],
+            # A receipt only. Compatibility is decided by the embedded
+            # contract's contractFormatVersion, which the kit reader checks.
+            "contractRevision": manifest["contract"]["revision"],
             "publishedAt": manifest["publishedAt"],
             "importedAt": datetime.now(timezone.utc).isoformat(),
             "sourceType": staged.source_type,
