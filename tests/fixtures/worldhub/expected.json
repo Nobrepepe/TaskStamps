@@ -1,0 +1,18 @@
+{
+  "appType": "task-stamps.stamp-set",
+  "contractId": "73aed5d4-bba1-48bb-ab39-cf69f4e1ced6",
+  "contractRevision": 1,
+  "libraryId": "accf99ea-75da-4957-9347-f9ac235a294a",
+  "productionId": "906b4f23-cc91-4c3e-bb3a-0582fe724bc7",
+  "publicationV1": "46cc9041-802d-4359-a932-68785c0fd393",
+  "publicationV2": "4652b0ff-a5a3-40b7-b42e-538adbae5931",
+  "worldId": "19dc0525-a741-4d28-9ea7-ba752c8150ad",
+  "characterIds": [
+    "b7b45c25-0a3c-4595-a911-117b1f714340",
+    "22bf9bb0-259f-4d01-8d96-e736abb9974e"
+  ],
+  "renamedCharacterId": "b7b45c25-0a3c-4595-a911-117b1f714340",
+  "retiredCharacterIds": [
+    "22bf9bb0-259f-4d01-8d96-e736abb9974e"
+  ]
+}

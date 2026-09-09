@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime
 
@@ -13,11 +14,24 @@ from task_stamps.utilities.ids import new_id
 _REFERENCING_COLUMNS: tuple[tuple[str, str], ...] = (
     ("worlds", "cover_asset_version_id"),
     ("characters", "portrait_asset_version_id"),
+    ("characters", "boss_image_asset_version_id"),
+    ("characters", "boss_sound_asset_version_id"),
     ("characters", "default_sound_asset_version_id"),
     ("character_stamps", "image_asset_version_id"),
     ("character_stamps", "sound_asset_version_id"),
     ("stamp_placements", "image_asset_version_id"),
     ("stamp_placements", "sound_asset_version_id"),
+    ("daily_bosses", "image_asset_version_id"),
+    ("daily_bosses", "sound_asset_version_id"),
+)
+
+# Settings that hold an asset version id. These live in app_settings as a
+# JSON-encoded string rather than in a column, so cleanup has to look for them
+# here too — otherwise it deletes the global sounds and leaves the setting
+# pointing at a version that no longer exists.
+_REFERENCING_SETTINGS: tuple[str, ...] = (
+    "fallback_sound_version_id",
+    "boss_fallback_sound_version_id",
 )
 
 
@@ -112,15 +126,29 @@ class AssetRepository(BaseRepository):
             )
             if row is not None:
                 return True
-        return False
+        placeholders = ", ".join("?" for _ in _REFERENCING_SETTINGS)
+        row = self.db.query_one(
+            f"SELECT 1 FROM app_settings WHERE key IN ({placeholders}) "
+            "AND serialized_value = ? LIMIT 1",
+            (*_REFERENCING_SETTINGS, json.dumps(version_id)),
+        )
+        return row is not None
 
     def unreferenced_versions(self) -> list[AssetVersion]:
-        conditions = " AND ".join(
+        conditions = [
             f"NOT EXISTS (SELECT 1 FROM {table} WHERE {column} = av.id)"
             for table, column in _REFERENCING_COLUMNS
+        ]
+        placeholders = ", ".join("?" for _ in _REFERENCING_SETTINGS)
+        # A settings value is the id JSON-encoded, which for an id is just the
+        # id in double quotes.
+        conditions.append(
+            f"NOT EXISTS (SELECT 1 FROM app_settings WHERE key IN ({placeholders}) "
+            "AND serialized_value = '\"' || av.id || '\"')"
         )
         rows = self.db.query_all(
-            f"SELECT av.* FROM asset_versions av WHERE {conditions}"
+            "SELECT av.* FROM asset_versions av WHERE " + " AND ".join(conditions),
+            _REFERENCING_SETTINGS,
         )
         return [_row_to_version(row) for row in rows]
 

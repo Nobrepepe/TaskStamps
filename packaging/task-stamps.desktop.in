@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Task Stamps
+GenericName=Habit Tracker
+Comment=Local-first habit tracker with collectible character stamps
+Exec=@EXEC@
+Path=@PROJECT_ROOT@
+Icon=task-stamps
+Terminal=false
+Categories=Office;ProjectManagement;
+Keywords=habit;habits;task;tasks;todo;streak;stamps;tracker;
+StartupNotify=true
+StartupWMClass=@WMCLASS@

@@ -15,6 +15,10 @@ Everything runs offline. No accounts, no cloud, no telemetry.
 - **Daily stamp board** — a large 16:9 board per calendar day; stamps land
   with a random position, slight rotation and scale, preferring uncrowded
   spots. Layouts are saved once and reproduce identically forever.
+- **Daily Boss rotation** — characters with dedicated Boss artwork rotate
+  in creation order each calendar day. Scheduled completions strike the Boss;
+  defeating it plays that character's own Boss sound, or the global Boss
+  sound when it has none.
 - **Recurring weekday tasks** — each task runs on specific weekdays
   (Monday–Sunday); a streak means consecutive *scheduled* completions.
 - **Character assignments** — one character per active task, drawn randomly
@@ -35,13 +39,17 @@ Everything runs offline. No accounts, no cloud, no telemetry.
   version; history keeps rendering the old bytes. Unreferenced files are only
   removed through an explicit maintenance action.
 - **Sounds** — the global stamp sound plays on every completion, followed by
-  the per-stamp sound or character default when assigned, with a mute switch
-  and master volume.
-- **Weighted rewards** — Trivial tasks award stamps only; Minor, Medium, and
-  Major tasks earn increasing point rewards, with larger rewards at streaks
-  5, 10, and 15.
-- **Vice Shop** — create personal rewards with a point price and inventory,
-  then spend completion points to claim them.
+  the per-stamp sound or character default when assigned. A global Boss sound
+  stands in whenever the day's Boss has no defeat sound of its own. Both are
+  live settings rather than frozen into history, with a mute switch and master
+  volume.
+- **Vice Chests** — write your own rewards into nine slots: Minor, Medium and
+  Major tasks crossed with streaks 5, 10 and 15. Reaching a milestone drops a
+  chest onto one random reward from that slot, waiting in the inventory until
+  you claim it. Trivial tasks award stamps only.
+- **Boss chests** — defeating the daily Boss seals a chest holding all nine
+  slots at once. Opening it rolls one reward, weighted by difficulty, so a
+  Major reward at streak 15 is the rarest thing in it.
 - **Backup / restore / export** — single-archive backups (database + assets
   + settings + schema metadata), validated restore with an automatic safety
   backup, and human-readable JSON export.
@@ -82,8 +90,8 @@ Everything runs offline. No accounts, no cloud, no telemetry.
 │   │   ├── library_service.py      # worlds & characters, readiness, safe archive
 │   │   ├── asset_service.py        # validated imports, immutable versions
 │   │   ├── backup_service.py       # backup/restore/export/factory reset
-│   │   ├── vice_service.py         # reward inventory and transactional claims
-│   │   ├── reward_service.py       # task-weight and streak reward schedule
+│   │   ├── chest_service.py        # reward slots, chest grants and claims
+│   │   ├── boss_service.py         # daily Boss rotation and progress
 │   │   ├── settings_service.py     # typed persisted settings
 │   ├── views/                  # Today, Tasks, Calendar, Worlds(+characters), Settings
 │   ├── components/             # board renderer, cards, aspect-ratio images
@@ -121,18 +129,44 @@ task-stamps
 python -m task_stamps
 ```
 
+## Desktop launcher (Linux)
+
+To start the app from the application menu or a pinned taskbar icon instead of
+a terminal, install the desktop entry once:
+
+```bash
+./packaging/install-desktop-entry.sh
+```
+
+This copies `packaging/task-stamps.svg` into the user icon theme and writes
+`~/.local/share/applications/task-stamps.desktop` pointing at
+`packaging/task-stamps`, a launcher that runs the app from the project's
+`.venv` — no shell activation needed. Search for **Task Stamps** in the
+launcher, start it, then right-click its task manager entry and choose *Pin*.
+
+- `packaging/task-stamps` is also a normal executable: run it from anywhere,
+  or double-click it in a file manager.
+- Launcher output goes to `logs/launcher.log` in the data directory below,
+  next to the app's own `task_stamps.log`.
+- Re-run the install script after moving the project directory; run it with
+  `--uninstall` to remove the entry and icons.
+- If the virtual environment is missing, the launcher shows an error dialog
+  with the commands to recreate it rather than failing silently.
+
 ## Running the tests
 
 ```bash
 pytest
 ```
 
-The suite (63 tests) covers streak progression, weighted point rewards,
-Vice Shop inventory and spending, per-day completion rules,
-missed-day drops (including multi-day closures and the "today is never
-missed" rule), pause behavior, the stamp-15 rollover and its undo, character
-exclusivity and pool rules, placement bounds/persistence/resize independence,
-asset version immutability, and backup/restore validation. Tests use
+The suite (105 tests) covers streak progression, chest grants at streaks 5,
+10 and 15, Boss chest sealing/opening and its weighted odds, claiming and the
+undo rules that protect it, per-day completion rules, missed-day drops
+(including multi-day closures and the "today is never missed" rule) and the
+three-miss auto-pause, pause behavior, the stamp-15 rollover and its undo,
+character exclusivity and pool rules, placement bounds/persistence/resize
+independence, asset version immutability, schema migrations, and
+backup/restore validation. Tests use
 temporary databases and asset directories, a fixed fake clock and a seeded
 random provider.
 
@@ -152,6 +186,41 @@ For development or a portable setup, point the app anywhere:
 ```bash
 TASK_STAMPS_DATA_DIR=./.local_data task-stamps
 ```
+
+## World Hub content
+
+Task Stamps can act as a consumer of [World Hub](../WorldHub) publications
+(Package Protocol 1, Application Contract 1). The authoritative contract this
+app supports lives at `worldhub/application-contract.json`.
+
+- **Install a ZIP** — Settings → World Hub content → *Install publication
+  ZIP…*. The package is extracted to a staging area, fully validated (safe
+  paths, manifest, embedded contract, every checksum, all references, then
+  Task Stamps' own rules: 15 stamps and a portrait per character), previewed,
+  and only then activated.
+- **Link a production folder** — point at the World Hub folder containing
+  `current.json`, then use *Check for update* whenever you republish. The
+  publication is copied into this app's own data directory
+  (`worldhub-content/`), so everything keeps working when the Hub library or
+  drive is unavailable.
+- **Activation is failure-safe** — the database import runs in one
+  transaction, the previous publication is retained for *Roll back*, and a
+  rejected or corrupt package changes nothing.
+- **Hub mode** — while a publication is active the Worlds/Characters library
+  is read-only; updates arrive through Settings. Legacy in-app authoring
+  returns if you never install a publication.
+- **What stays yours** — tasks, schedules, assignments, streaks, completions,
+  board placements, rewards, chests, and settings are app-owned and survive
+  content updates, retirements, failed imports, and rollback. Hub art is
+  imported through the immutable asset-version system, so historical boards
+  keep rendering the exact bytes they were completed with. Characters that
+  leave a publication are archived (never deleted) and active tasks are
+  reassigned using the existing safe replacement behavior.
+- **Provenance** — every install writes a receipt
+  (`worldhub-content/receipts/<publicationId>.json`) recording the source
+  library, production, publication, contract version, and checksums; backups
+  include the receipts and active pointer but not the recoverable package
+  caches.
 
 ## Backup and restore
 

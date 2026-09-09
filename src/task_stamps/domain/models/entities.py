@@ -9,6 +9,7 @@ from task_stamps.domain.enums import (
     AssignmentEndReason,
     AssetType,
     CharacterStatus,
+    ChestSource,
     PoolType,
     TaskStatus,
     TaskWeight,
@@ -33,6 +34,8 @@ class Character:
     name: str
     description: str
     portrait_asset_version_id: str | None
+    boss_image_asset_version_id: str | None
+    boss_sound_asset_version_id: str | None
     default_sound_asset_version_id: str | None
     status: CharacterStatus
     is_archived: bool
@@ -94,7 +97,6 @@ class TaskCompletion:
     task_name_snapshot: str
     character_name_snapshot: str
     world_name_snapshot: str
-    reward_points: int
     is_reversed: bool
     reversed_at: datetime | None
 
@@ -143,23 +145,40 @@ class AssetVersion:
 
 
 @dataclass
-class ViceOffering:
+class ViceReward:
+    """One user-defined reward living in a (weight, streak tier) slot."""
+
     id: str
+    task_weight: TaskWeight
+    tier: int
     name: str
     description: str
-    price: int
-    quantity: int
+    is_archived: bool
     created_at: datetime
     updated_at: datetime
 
 
 @dataclass
-class ViceClaim:
+class ViceChest:
+    """An earned chest. Streak chests name their reward at grant time; a Boss
+    chest stays sealed (no reward) until it is opened."""
+
     id: str
-    offering_id: str | None
-    offering_name_snapshot: str
-    price_paid: int
-    claimed_at: datetime
+    source: ChestSource
+    reward_id: str | None
+    reward_name_snapshot: str | None
+    completion_id: str | None
+    boss_date: date | None
+    granted_at: datetime
+    claimed_at: datetime | None
+
+    @property
+    def is_claimed(self) -> bool:
+        return self.claimed_at is not None
+
+    @property
+    def is_sealed(self) -> bool:
+        return self.source is ChestSource.BOSS and self.reward_id is None
 
 
 @dataclass
@@ -176,3 +195,24 @@ class BoardStamp:
     character_name_snapshot: str
     image_relative_path: str
     sound_relative_path: str | None
+
+
+@dataclass(frozen=True)
+class DailyBoss:
+    date: date
+    character_id: str
+    name: str
+    world_name: str
+    day_number: int
+    image_relative_path: str
+    sound_relative_path: str | None
+    strikes_landed: int
+    strikes_target: int
+
+    @property
+    def strikes_remaining(self) -> int:
+        return max(0, self.strikes_target - self.strikes_landed)
+
+    @property
+    def defeated(self) -> bool:
+        return self.strikes_target > 0 and self.strikes_landed >= self.strikes_target

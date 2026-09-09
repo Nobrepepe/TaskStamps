@@ -7,17 +7,17 @@ from task_stamps.data.repositories.settings import SettingsRepository
 KEY_SOUND_ENABLED = "sound_enabled"
 KEY_MASTER_VOLUME = "master_volume"
 KEY_FALLBACK_SOUND = "fallback_sound_version_id"
+KEY_BOSS_FALLBACK_SOUND = "boss_fallback_sound_version_id"
 KEY_REDUCED_ANIMATION = "reduced_animation"
 KEY_WEEK_START = "week_start"  # "monday" | "sunday"
 KEY_BOARD_BACKGROUND = "board_background"
+KEY_BOSS_BANNER = "boss_banner_enabled"
 
 BOARD_BACKGROUNDS: dict[str, str] = {
-    "White": "#FFFFFF",
-    "Paper": "#F4F1EA",
-    "Linen": "#EDE8E0",
-    "Mist": "#E8ECEE",
-    "Sage": "#E6EBE4",
-    "Slate": "#3A3F44",
+    "Recessed": "#171310",
+    "Level": "#12100f",
+    "Warmer": "#1d1714",
+    "Ink": "#0d0c0b",
 }
 
 
@@ -50,6 +50,15 @@ class SettingsService:
     def fallback_sound_version_id(self, value: str | None) -> None:
         self.repo.set(KEY_FALLBACK_SOUND, value)
 
+    @property
+    def boss_fallback_sound_version_id(self) -> str | None:
+        """The Boss defeat sound used when the day's character has none."""
+        return self.repo.get(KEY_BOSS_FALLBACK_SOUND, None)
+
+    @boss_fallback_sound_version_id.setter
+    def boss_fallback_sound_version_id(self, value: str | None) -> None:
+        self.repo.set(KEY_BOSS_FALLBACK_SOUND, value)
+
     # -- interface ----------------------------------------------------
     @property
     def reduced_animation(self) -> bool:
@@ -58,6 +67,14 @@ class SettingsService:
     @reduced_animation.setter
     def reduced_animation(self, value: bool) -> None:
         self.repo.set(KEY_REDUCED_ANIMATION, bool(value))
+
+    @property
+    def boss_banner_enabled(self) -> bool:
+        return bool(self.repo.get(KEY_BOSS_BANNER, True))
+
+    @boss_banner_enabled.setter
+    def boss_banner_enabled(self, value: bool) -> None:
+        self.repo.set(KEY_BOSS_BANNER, bool(value))
 
     @property
     def week_start(self) -> str:
@@ -71,8 +88,8 @@ class SettingsService:
 
     @property
     def board_background(self) -> str:
-        name = str(self.repo.get(KEY_BOARD_BACKGROUND, "White"))
-        return name if name in BOARD_BACKGROUNDS else "White"
+        name = str(self.repo.get(KEY_BOARD_BACKGROUND, "Recessed"))
+        return name if name in BOARD_BACKGROUNDS else "Recessed"
 
     @board_background.setter
     def board_background(self, value: str) -> None:

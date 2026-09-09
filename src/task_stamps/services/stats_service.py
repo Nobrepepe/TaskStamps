@@ -6,6 +6,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import date, timedelta
 
+from task_stamps.data.repositories.chests import ChestRepository
 from task_stamps.data.repositories.completions import CompletionRepository
 from task_stamps.data.repositories.tasks import TaskRepository
 from task_stamps.domain.enums import TaskStatus
@@ -27,7 +28,7 @@ class StatsSnapshot:
     possible_days: int
     current_run: int
     best_day: tuple[date, int] | None
-    points: int
+    chests_earned: int
     daily: tuple[tuple[date, int], ...]
     weekdays: tuple[int, ...]
     tasks: tuple[RankedItem, ...]
@@ -38,11 +39,16 @@ class StatsSnapshot:
 
 class StatsService:
     def __init__(
-        self, clock: Clock, completions: CompletionRepository, tasks: TaskRepository
+        self,
+        clock: Clock,
+        completions: CompletionRepository,
+        tasks: TaskRepository,
+        chests: ChestRepository,
     ) -> None:
         self.clock = clock
         self.completions = completions
         self.tasks = tasks
+        self.chests = chests
 
     def snapshot(self, days: int = 30) -> StatsSnapshot:
         if days < 1:
@@ -88,7 +94,7 @@ class StatsService:
             possible_days=days,
             current_run=current_run,
             best_day=best_day,
-            points=sum(item.reward_points for item in completions),
+            chests_earned=self.chests.count_granted_between(start, end),
             daily=daily,
             weekdays=weekdays,
             tasks=ranked(Counter(item.task_name_snapshot for item in completions)),

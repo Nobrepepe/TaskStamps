@@ -21,6 +21,18 @@ class TaskWeight(StrEnum):
     MAJOR = "major"
 
 
+class ChestSource(StrEnum):
+    STREAK = "streak"
+    BOSS = "boss"
+
+
+#: Streak milestones inside a character run that hand out a chest.
+CHEST_TIERS = (5, 10, 15)
+
+#: Weights that earn chests; Trivial tasks award stamps only.
+CHEST_WEIGHTS = (TaskWeight.MINOR, TaskWeight.MEDIUM, TaskWeight.MAJOR)
+
+
 class CharacterStatus(StrEnum):
     DRAFT = "draft"
     READY = "ready"
@@ -43,6 +55,7 @@ class AssignmentEndReason(StrEnum):
 class AssetType(StrEnum):
     WORLD_COVER = "world_cover"
     PORTRAIT = "portrait"
+    BOSS_IMAGE = "boss_image"
     STAMP_IMAGE = "stamp_image"
     SOUND = "sound"
 

@@ -1,0 +1,14 @@
+{
+  "kitVersion": 1,
+  "protocolVersion": 2,
+  "vocabularyVersion": 1,
+  "files": {
+    "CONSUMER_GUIDE.md": "4ff6cae9ef1ccbf1379fe6dd16bab5110632d73494c5b506c8ce63af939b01a0",
+    "connection-kinds.json": "3e24a272008b565ed25760dfc564990c7c04abbc3e866b1ef6f05013c3d37a95",
+    "js/verify.mjs": "ab70082e23893bcd5a8d6782e251c7a1a1889756f6613f11c8eab43dd05c6994",
+    "kit.json": "999b3afd76fbefa149267a292b86528c2779443a8dc44e0f1909fdd25ae530a8",
+    "py/worldhub_kit/__init__.py": "d9beb444043986bd704eee67b1cb73d6bd463b454d0d10847a0b62d612713bd5",
+    "py/worldhub_kit/package_reader.py": "e5d96321542468cab3f4f1bb3179786b4f4b2e48f244e5bb9a46f5e1ac04229c",
+    "vocabulary.json": "437406200546d1f3b18a513c2c7b6b889be3fadb0661dd17709fdeac60162263"
+  }
+}

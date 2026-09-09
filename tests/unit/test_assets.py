@@ -6,7 +6,7 @@ import pytest
 
 from task_stamps.domain.enums import AssetType
 from task_stamps.domain.exceptions import AssetImportError
-from task_stamps.utilities.placeholder_art import render_stamp_png
+from task_stamps.utilities.placeholder_art import render_beep_wav, render_stamp_png
 from tests.helpers import EVERY_DAY, make_character, make_task, make_world
 
 
@@ -90,3 +90,29 @@ def test_cleanup_only_removes_unreferenced_versions(container, clock, source_fil
         referenced_version
     ).relative_path
     assert path.is_file()
+
+
+def test_cleanup_spares_sounds_referenced_only_by_settings(container, source_files):
+    """The global sounds live in app_settings, not in a column, so cleanup has
+    to look there too — otherwise it deletes them and leaves the setting
+    pointing at a version that no longer exists."""
+    settings = container.settings_service
+
+    def import_sound(name: str):
+        audio = source_files / name
+        render_beep_wav(audio, duration=0.02)
+        return container.asset_service.import_file(audio, AssetType.SOUND)
+
+    stamp_sound = import_sound("global_stamp.wav")
+    boss_sound = import_sound("global_boss.wav")
+    orphan = import_sound("orphan.wav")
+    settings.fallback_sound_version_id = stamp_sound.id
+    settings.boss_fallback_sound_version_id = boss_sound.id
+
+    assert container.asset_service.cleanup_unreferenced_versions() == 1
+
+    assert container.asset_service.path_for_version_id(stamp_sound.id) is not None
+    assert container.asset_service.path_for_version_id(boss_sound.id) is not None
+    assert container.asset_service.path_for_version_id(orphan.id) is None
+    assert container.assets.is_version_referenced(stamp_sound.id)
+    assert container.assets.is_version_referenced(boss_sound.id)

@@ -1,5 +1,4 @@
-"""Small reusable interface pieces. Deliberately neutral and quiet so the
-imported character artwork stays the visual focus."""
+"""Reusable dark-archive interface controls."""
 
 from __future__ import annotations
 
@@ -7,125 +6,109 @@ from typing import Callable
 
 import flet as ft
 
+from task_stamps.components.theme import (
+    BAD,
+    BG,
+    FAINT,
+    GLOW_TEAL,
+    MUTED_2,
+    SANS,
+    TEXT,
+    dialog_action,
+    eyebrow,
+    style_dialog,
+)
 from task_stamps.domain.enums import STAMPS_PER_CHARACTER
 
-PORTRAIT_RATIO = 3 / 4  # width : height (portrait, taller than wide)
-STAMP_RATIO = 4 / 3  # width : height (landscape, wider than tall)
-
-BORDER_COLOR = "#E2E0DB"
-MUTED_TEXT = "#8A8880"
-CARD_BG = "#FFFFFF"
+PORTRAIT_RATIO = 3 / 4
+STAMP_RATIO = 4 / 3
+BOSS_RATIO = 16 / 9
 
 
-def framed_image(
+def bleeding_image(
     src: str | None,
     width: float | None,
     ratio: float,
     *,
-    icon: str = ft.Icons.IMAGE_OUTLINED,
-    radius: int = 8,
-) -> ft.Container:
-    """Aspect-ratio image container. With an explicit width it is fixed size
-    and never stretches; with width=None it instead expands to fill
-    whatever space its parent gives it (e.g. inside a grid cell)."""
-    content: ft.Control
-    if width is None:
-        content = (
-            ft.Image(src=src, expand=True, fit=ft.ImageFit.CONTAIN)
-            if src
-            else ft.Icon(icon, size=40, color=MUTED_TEXT)
-        )
-        return ft.Container(
-            content=content,
-            expand=True,
-            alignment=ft.alignment.center,
-            bgcolor="#F5F4F0",
-            border=ft.border.all(1, BORDER_COLOR),
-            border_radius=radius,
-        )
-    height = width / ratio
+    glow: bool = True,
+    radius_stops: tuple[float, float] = (0.48, 1.0),
+) -> ft.Control:
+    height = width / ratio if width is not None else None
     if src:
-        content = ft.Image(
-            src=src, width=width, height=height, fit=ft.ImageFit.CONTAIN
+        art: ft.Control = ft.Image(
+            src=src,
+            width=width,
+            height=height,
+            expand=width is None,
+            fit=ft.ImageFit.CONTAIN,
         )
     else:
-        content = ft.Icon(icon, size=min(width, height) * 0.4, color=MUTED_TEXT)
-    return ft.Container(
-        content=content,
+        art = ft.Container(
+            width=width,
+            height=height,
+            expand=width is None,
+            image=ft.DecorationImage(
+                src="/ui/hatch.png",
+                repeat=ft.ImageRepeat.REPEAT,
+            ),
+            alignment=ft.alignment.center,
+            content=ft.Text(
+                "NO ART",
+                size=11,
+                color=FAINT,
+                font_family=SANS,
+                style=ft.TextStyle(letter_spacing=1.6),
+            ),
+        )
+    masked = ft.ShaderMask(
+        content=art,
         width=width,
         height=height,
-        alignment=ft.alignment.center,
-        bgcolor="#F5F4F0",
-        border=ft.border.all(1, BORDER_COLOR),
-        border_radius=radius,
+        expand=width is None,
+        shader=ft.RadialGradient(
+            center=ft.alignment.Alignment(0, -0.1),
+            radius=1.0,
+            colors=["#FF000000", "#00000000"],
+            stops=list(radius_stops),
+        ),
+        blend_mode=ft.BlendMode.DST_IN,
     )
-
-
-def portrait_image(src: str | None, width: float | None = 96) -> ft.Container:
-    return framed_image(src, width, PORTRAIT_RATIO, icon=ft.Icons.PERSON_OUTLINED)
-
-
-def stamp_image(src: str | None, width: float = 96) -> ft.Container:
-    return framed_image(src, width, STAMP_RATIO)
-
-
-def progress_dots(
-    used: set[int], next_number: int | None, size: float = 14
-) -> ft.Row:
-    """Fifteen-step progress: used stamps filled, next highlighted, rest faint."""
-    dots: list[ft.Control] = []
-    for number in range(1, STAMPS_PER_CHARACTER + 1):
-        if number in used:
-            color, border = "#7C8B74", None
-        elif number == next_number:
-            color, border = "#FFFFFF", ft.border.all(2, "#7C8B74")
-        else:
-            color, border = "#EDECE7", ft.border.all(1, BORDER_COLOR)
-        dots.append(
+    layers: list[ft.Control] = []
+    if glow:
+        layers.append(
             ft.Container(
-                width=size,
-                height=size,
-                bgcolor=color,
-                border=border,
-                border_radius=size / 2,
-                tooltip=f"Stamp {number}",
+                width=width,
+                height=height,
+                expand=width is None,
+                gradient=ft.RadialGradient(
+                    center=ft.alignment.Alignment(0, -0.1),
+                    radius=0.6,
+                    colors=[GLOW_TEAL, "#0012100f"],
+                ),
             )
         )
-    return ft.Row(dots, spacing=4, wrap=True)
+    layers.append(masked)
+    return ft.Stack(layers, width=width, height=height, expand=width is None)
 
 
-def status_chip(text: str, color: str = "#8A8880") -> ft.Container:
-    return ft.Container(
-        content=ft.Text(text, size=11, color="#FFFFFF", weight=ft.FontWeight.W_500),
-        bgcolor=color,
-        padding=ft.padding.symmetric(horizontal=8, vertical=2),
-        border_radius=10,
-    )
+def portrait_image(src: str | None, width: float | None = 96) -> ft.Control:
+    return bleeding_image(src, width, PORTRAIT_RATIO)
 
 
-STATUS_COLORS = {
-    "draft": "#A8A6A0",
-    "active": "#7C8B74",
-    "paused": "#C2A36B",
-    "archived": "#8A8880",
-    "ready": "#7C8B74",
-}
+def stamp_image(src: str | None, width: float = 96) -> ft.Control:
+    return bleeding_image(src, width, STAMP_RATIO, glow=False)
 
 
-def card(content: ft.Control, padding: int = 14, on_click=None) -> ft.Container:
-    return ft.Container(
-        content=content,
-        bgcolor=CARD_BG,
-        border=ft.border.all(1, BORDER_COLOR),
-        border_radius=10,
-        padding=padding,
-        on_click=on_click,
-        ink=on_click is not None,
-    )
+def progress_run(used: set[int], next_number: int | None) -> ft.Row:
+    controls: list[ft.Control] = []
+    for number in range(1, STAMPS_PER_CHARACTER + 1):
+        color = TEXT if number in used else "#6Bf4ece1" if number == next_number else "#24f4ece1"
+        controls.append(ft.Container(width=7, height=2, bgcolor=color))
+    return ft.Row(controls, spacing=3)
 
 
 def section_title(text: str) -> ft.Text:
-    return ft.Text(text, size=13, weight=ft.FontWeight.W_600, color=MUTED_TEXT)
+    return eyebrow(text)
 
 
 def confirm_dialog(
@@ -135,21 +118,25 @@ def confirm_dialog(
     on_confirm: Callable[[], None],
     confirm_label: str = "Confirm",
 ) -> None:
-    dialog = ft.AlertDialog(
-        modal=True,
-        title=ft.Text(title),
-        content=ft.Text(message),
+    dialog = style_dialog(
+        ft.AlertDialog(
+            modal=True,
+            title=ft.Text(title),
+            content=ft.Text(message, color=MUTED_2, font_family=SANS),
+        )
     )
+    app = getattr(page, "data", None)
 
     def close(_=None) -> None:
-        page.close(dialog)
+        app.close_dialog(dialog) if app and hasattr(app, "close_dialog") else page.close(dialog)
 
     def confirm(_=None) -> None:
-        page.close(dialog)
+        app.close_dialog(dialog) if app and hasattr(app, "close_dialog") else page.close(dialog)
         on_confirm()
 
+    destructive = confirm_label.lower().startswith(("archive", "remove", "reset"))
     dialog.actions = [
-        ft.TextButton("Cancel", on_click=close),
-        ft.FilledButton(confirm_label, on_click=confirm),
+        dialog_action("Cancel", close),
+        dialog_action(confirm_label, confirm, destructive=destructive),
     ]
-    page.open(dialog)
+    app.open_dialog(dialog) if app and hasattr(app, "open_dialog") else page.open(dialog)

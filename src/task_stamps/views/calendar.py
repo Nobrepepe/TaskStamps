@@ -8,7 +8,7 @@ from datetime import date
 import flet as ft
 
 from task_stamps.components.board import build_board
-from task_stamps.components.common import BORDER_COLOR, MUTED_TEXT
+from task_stamps.components.theme import BOARD_FLOOR, FAINT, MUTED_2, SERIF, TEXT, TEXT_DIM, LINE
 from task_stamps.components.stamp_details import show_stamp_details
 from task_stamps.domain.enums import WEEKDAY_SHORT
 from task_stamps.domain.models import BoardStamp
@@ -22,9 +22,9 @@ class CalendarView(View):
         today = self.app.container.clock.today()
         self.year = today.year
         self.month = today.month
-        self.title_text = ft.Text("", size=20, weight=ft.FontWeight.W_600)
+        self.title_text = ft.Text("", size=40, color=TEXT, font_family=SERIF)
         header = ft.Container(
-            padding=ft.padding.only(left=24, right=24, top=18, bottom=8),
+            padding=ft.padding.only(left=56, right=56, top=40, bottom=20),
             content=ft.Row(
                 [
                     self.title_text,
@@ -42,7 +42,7 @@ class CalendarView(View):
             ),
         )
         self.grid_host = ft.Container(
-            expand=True, padding=ft.padding.only(left=24, right=24, bottom=20)
+            expand=True, padding=ft.padding.only(left=56, right=56, bottom=72)
         )
         return ft.Column([header, self.grid_host], expand=True, spacing=0)
 
@@ -83,7 +83,7 @@ class CalendarView(View):
             ft.Row(
                 [
                     ft.Container(
-                        content=ft.Text(label, size=11, color=MUTED_TEXT),
+                        content=ft.Text(label, size=11, color=MUTED_2),
                         expand=True,
                         alignment=ft.alignment.center,
                     )
@@ -114,13 +114,13 @@ class CalendarView(View):
                         str(day.day),
                         size=12,
                         weight=ft.FontWeight.W_600 if is_today else None,
-                        color="#3A3F44" if in_month and not is_future else "#B9B7B0",
+                        color=TEXT_DIM if in_month and not is_future else FAINT,
                     ),
                     ft.Container(expand=True),
                     ft.Text(
                         str(len(stamps)) if stamps else "",
                         size=11,
-                        color=MUTED_TEXT,
+                        color=MUTED_2,
                     ),
                 ]
             )
@@ -137,15 +137,14 @@ class CalendarView(View):
             ]
             children.append(ft.Row(previews, spacing=2))
             children.append(
-                ft.Container(height=3, bgcolor="#7C8B74", border_radius=2, width=24)
+                ft.Container(height=2, bgcolor=TEXT, width=24)
             )
         return ft.Container(
             content=ft.Column(children, spacing=4),
             expand=True,
             padding=8,
-            bgcolor="#FFFFFF" if in_month else "#F7F6F2",
-            border=ft.border.all(2 if is_today else 1, "#7C8B74" if is_today else BORDER_COLOR),
-            border_radius=8,
+            bgcolor=BOARD_FLOOR if in_month else "#12100f",
+            border=ft.border.only(bottom=ft.BorderSide(2 if is_today else 1, TEXT if is_today else LINE)),
             opacity=0.55 if is_future else 1.0,
             on_click=(lambda _, d=day: self.app.open_history_board(d)) if not is_future else None,
             ink=not is_future,
@@ -172,5 +171,5 @@ def open_history_board_dialog(app, day: date) -> None:
         title=ft.Text(day.strftime("%A, %d %B %Y")),
         content=ft.Container(content=board, width=board_w, height=board_h),
     )
-    dialog.actions = [ft.TextButton("Close", on_click=lambda _: app.page.close(dialog))]
-    app.page.open(dialog)
+    dialog.actions = [ft.TextButton("Close", on_click=lambda _: app.close_dialog(dialog))]
+    app.open_dialog(dialog)

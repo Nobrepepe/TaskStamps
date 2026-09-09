@@ -127,6 +127,17 @@ def render_portrait_png(
     write_png(path, width, height, pixels)
 
 
+def render_hatch_png(path: Path, size: int = 16) -> None:
+    """Small warm-white diagonal hatch tile used by missing-art masks."""
+    floor = (18, 16, 15)
+    line = (44, 41, 38)
+    pixels = [
+        [line if (x - y) % 8 == 0 else floor for x in range(size)]
+        for y in range(size)
+    ]
+    write_png(path, size, size, pixels)
+
+
 def render_beep_wav(path: Path, frequency: float = 660.0, duration: float = 0.18) -> None:
     """Short sine beep with a soft decay envelope."""
     rate = 22050

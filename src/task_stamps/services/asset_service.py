@@ -19,10 +19,16 @@ from task_stamps.domain.models import AssetVersion
 from task_stamps.utilities.files import sha256_of
 from task_stamps.utilities.ids import new_id
 from task_stamps.utilities.logging_setup import get_logger
+from task_stamps.utilities.placeholder_art import render_hatch_png
 
 logger = get_logger("assets")
 
-_IMAGE_TYPES = {AssetType.WORLD_COVER, AssetType.PORTRAIT, AssetType.STAMP_IMAGE}
+_IMAGE_TYPES = {
+    AssetType.WORLD_COVER,
+    AssetType.PORTRAIT,
+    AssetType.BOSS_IMAGE,
+    AssetType.STAMP_IMAGE,
+}
 
 _IMAGE_EXTENSIONS = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 _SOUND_EXTENSIONS = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg"}
@@ -30,6 +36,7 @@ _SOUND_EXTENSIONS = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/o
 _SUBDIR_BY_TYPE = {
     AssetType.WORLD_COVER: "worlds",
     AssetType.PORTRAIT: "characters",
+    AssetType.BOSS_IMAGE: "bosses",
     AssetType.STAMP_IMAGE: "stamps",
     AssetType.SOUND: "sounds",
 }
@@ -59,6 +66,21 @@ class AssetService:
     def __init__(self, config: AppConfig, assets: AssetRepository) -> None:
         self.config = config
         self.assets = assets
+
+    def ensure_bundled_assets(self) -> None:
+        """Expose packaged fonts and generated UI textures on Flet's data route."""
+        bundled = Path(__file__).resolve().parent.parent / "assets"
+        font_target = self.config.data_dir / "fonts"
+        font_target.mkdir(parents=True, exist_ok=True)
+        if bundled.is_dir():
+            for source in (bundled / "fonts").glob("*"):
+                if source.is_file():
+                    destination = font_target / source.name
+                    if not destination.exists() or destination.stat().st_size != source.stat().st_size:
+                        shutil.copy2(source, destination)
+        hatch = self.config.data_dir / "ui" / "hatch.png"
+        if not hatch.exists():
+            render_hatch_png(hatch)
 
     def import_file(
         self,
@@ -123,14 +145,21 @@ class AssetService:
             raise
 
     def replace_version(
-        self, old_version_id: str | None, source: Path | str, asset_type: AssetType
+        self,
+        old_version_id: str | None,
+        source: Path | str,
+        asset_type: AssetType,
     ) -> AssetVersion:
         """Import a new version of the same logical asset (or a new asset)."""
         asset_id = None
         if old_version_id is not None:
             old = self.assets.find_version(old_version_id)
             asset_id = old.asset_id if old else None
-        return self.import_file(source, asset_type, existing_asset_id=asset_id)
+        return self.import_file(
+            source,
+            asset_type,
+            existing_asset_id=asset_id,
+        )
 
     def absolute_path(self, version: AssetVersion) -> Path:
         path = (self.config.data_dir / version.relative_path).resolve()

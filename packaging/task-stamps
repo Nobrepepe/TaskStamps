@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Desktop launcher for Task Stamps.
+#
+# Runs the app straight from the project's virtual environment, so no shell
+# activation is needed. Safe to run from a taskbar, menu or file manager;
+# stdout/stderr land in the app's own logs directory next to task_stamps.log.
+
+set -uo pipefail
+
+here="$(cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")" && pwd)"
+project_root="$(dirname -- "$here")"
+
+data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/task-stamps/app_data"
+log_dir="$data_dir/logs"
+mkdir -p "$log_dir" 2>/dev/null || log_dir=""
+
+fail() {
+    local message="$1"
+    if command -v kdialog >/dev/null 2>&1; then
+        kdialog --title "Task Stamps" --error "$message"
+    elif command -v zenity >/dev/null 2>&1; then
+        zenity --error --title "Task Stamps" --text "$message"
+    fi
+    echo "task-stamps: $message" >&2
+    exit 1
+}
+
+venv_bin="$project_root/.venv/bin"
+if [[ -x "$venv_bin/task-stamps" ]]; then
+    launch=("$venv_bin/task-stamps")
+elif [[ -x "$venv_bin/python" ]]; then
+    launch=("$venv_bin/python" -m task_stamps)
+elif command -v task-stamps >/dev/null 2>&1; then
+    launch=("$(command -v task-stamps)")
+else
+    fail "Could not find the Task Stamps environment in:\n$project_root/.venv\n\nRecreate it with:\npython3 -m venv .venv && .venv/bin/pip install -e \".[dev]\""
+fi
+
+cd -- "$project_root" || fail "Project directory is missing: $project_root"
+
+if [[ -n "$log_dir" ]]; then
+    exec "${launch[@]}" "$@" >>"$log_dir/launcher.log" 2>&1
+fi
+exec "${launch[@]}" "$@"

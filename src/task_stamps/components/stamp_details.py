@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable
 
 import flet as ft
 
-from task_stamps.components.common import MUTED_TEXT
+from task_stamps.components.theme import MUTED, SERIF, TEXT
 from task_stamps.domain.exceptions import TaskStampsError
 from task_stamps.domain.models import BoardStamp
 
@@ -33,13 +33,13 @@ def show_stamp_details(
             height=180,
             fit=ft.ImageFit.CONTAIN,
         ),
-        ft.Text(stamp.character_name_snapshot, size=18, weight=ft.FontWeight.W_600),
-        ft.Text(f"Task: {stamp.task_name_snapshot}", color=MUTED_TEXT),
-        ft.Text(f"Stamp {stamp.streak_number} of 15", color=MUTED_TEXT),
+        ft.Text(stamp.character_name_snapshot, size=22, color=TEXT, font_family=SERIF),
+        ft.Text(f"Task: {stamp.task_name_snapshot}", color=MUTED),
+        ft.Text(f"Stamp {stamp.streak_number} of 15", color=MUTED),
         ft.Text(
             "Completed "
             + stamp.completed_at.strftime("%A, %d %B %Y at %H:%M"),
-            color=MUTED_TEXT,
+            color=MUTED,
             size=12,
         ),
     ]
@@ -51,7 +51,7 @@ def show_stamp_details(
     )
 
     def close(_=None) -> None:
-        page.close(dialog)
+        app.close_dialog(dialog)
 
     def play(_=None) -> None:
         app.play_board_stamp_sound(stamp)
@@ -62,7 +62,7 @@ def show_stamp_details(
         except TaskStampsError as error:
             app.error(error)
             return
-        page.close(dialog)
+        app.close_dialog(dialog)
         app.notify("Completion undone — the task is available again today.")
         if on_undone:
             on_undone()
@@ -78,4 +78,4 @@ def show_stamp_details(
         )
     actions.append(ft.TextButton("Close", on_click=close))
     dialog.actions = actions
-    page.open(dialog)
+    app.open_dialog(dialog)
