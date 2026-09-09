@@ -6,7 +6,8 @@ from pathlib import Path
 
 import flet as ft
 
-from task_stamps.components.common import MUTED_TEXT, card, section_title
+from task_stamps.components.common import section_title
+from task_stamps.components.theme import BAD, MUTED, SERIF, TEXT, TEXT_DIM, eyebrow, hairline
 from task_stamps.domain.enums import AssetType
 from task_stamps.domain.exceptions import TaskStampsError
 from task_stamps.services.settings_service import BOARD_BACKGROUNDS
@@ -14,6 +15,10 @@ from task_stamps.views.base import View
 
 _SOUND_EXTS = ["wav", "mp3", "ogg"]
 _BACKUP_EXTS = ["zip"]
+
+
+def _group(content: ft.Control) -> ft.Control:
+    return ft.Column([content, hairline()], spacing=18)
 
 
 class SettingsView(View):
@@ -72,13 +77,13 @@ class SettingsView(View):
                 except TaskStampsError as error:
                     self.app.error(error)
                     return
-                self.page.close(dialog)
+                self.app.close_dialog(dialog)
                 self.app.notify("The publication is now active.")
                 self.refresh()
 
             def cancel(_) -> None:
                 staged.cleanup()
-                self.page.close(dialog)
+                self.app.close_dialog(dialog)
 
             dialog = ft.AlertDialog(
                 modal=True,
@@ -86,9 +91,9 @@ class SettingsView(View):
                 content=ft.Column(
                     [ft.Text(line, size=13) for line in lines]
                     + [ft.Text(
-                        "Tasks, streaks, completions, boards, and points are never touched. "
+                        "Tasks, streaks, completions, boards, and chests are never touched. "
                         "If anything fails, the current content stays active.",
-                        size=12, color=MUTED_TEXT,
+                        size=12, color=MUTED,
                     )],
                     tight=True, spacing=6, width=460,
                 ),
@@ -97,7 +102,7 @@ class SettingsView(View):
                     ft.TextButton("Cancel", on_click=cancel),
                 ],
             )
-            self.page.open(dialog)
+            self.app.open_dialog(dialog)
 
         def install_zip(_) -> None:
             def handle(path: str) -> None:
@@ -140,20 +145,20 @@ class SettingsView(View):
             self.refresh()
 
         actions = [
-            ft.FilledTonalButton("Install publication ZIP…", on_click=install_zip),
-            ft.FilledTonalButton("Link production folder…", on_click=link_folder),
+            ft.TextButton("Install publication ZIP…", on_click=install_zip),
+            ft.TextButton("Link production folder…", on_click=link_folder),
         ]
         if status["linked_folder"]:
-            actions.append(ft.FilledTonalButton("Check for update", on_click=check_update))
+            actions.append(ft.TextButton("Check for update", on_click=check_update))
         if status["previous_publication_id"]:
             actions.append(ft.TextButton("Roll back", on_click=roll_back))
 
-        return card(
+        return _group(
             ft.Column(
                 [
                     section_title("World Hub content"),
                     ft.Text(summary, size=13),
-                    ft.Text(f"Linked folder: {linked}", size=12, color=MUTED_TEXT, selectable=True),
+                    ft.Text(f"Linked folder: {linked}", size=12, color=MUTED, selectable=True),
                     ft.Row(actions, spacing=10, wrap=True),
                 ],
                 spacing=10,
@@ -165,11 +170,12 @@ class SettingsView(View):
             spacing=14, scroll=ft.ScrollMode.AUTO, expand=True
         )
         header = ft.Container(
-            padding=ft.padding.only(left=24, right=24, top=18, bottom=8),
-            content=ft.Text("Settings", size=20, weight=ft.FontWeight.W_600),
+            padding=ft.padding.only(left=56, right=56, top=40, bottom=20),
+            content=ft.Column([eyebrow("Preferences"), ft.Text("Settings", size=48, color=TEXT, font_family=SERIF),
+                               ft.Text("Tune the archive, its sound, and your local data.", size=15, color=TEXT_DIM)], spacing=10),
         )
         return ft.Column(
-            [header, ft.Container(self.body, padding=ft.padding.symmetric(horizontal=24), expand=True)],
+            [header, ft.Container(self.body, padding=ft.padding.only(left=56, right=56, bottom=72), expand=True)],
             expand=True,
             spacing=0,
         )
@@ -196,7 +202,7 @@ class SettingsView(View):
         fallback_label = ft.Text(
             "Set" if settings.fallback_sound_version_id else "Not set",
             size=12,
-            color=MUTED_TEXT,
+            color=MUTED,
         )
 
         def import_fallback(_) -> None:
@@ -234,6 +240,13 @@ class SettingsView(View):
             value=settings.reduced_animation,
             on_change=lambda e: self._set(
                 lambda: setattr(settings, "reduced_animation", e.control.value)
+            ),
+        )
+        boss_switch = ft.Switch(
+            label="Show the daily Boss banner",
+            value=settings.boss_banner_enabled,
+            on_change=lambda e: self._set(
+                lambda: setattr(settings, "boss_banner_enabled", e.control.value)
             ),
         )
         week_dropdown = ft.Dropdown(
@@ -298,24 +311,24 @@ class SettingsView(View):
             )
 
             def cancel(_=None) -> None:
-                self.page.close(dialog)
+                self.app.close_dialog(dialog)
 
             def reset(_=None) -> None:
                 try:
                     container.backup_service.factory_reset()
                 except TaskStampsError as error:
-                    self.page.close(dialog)
+                    self.app.close_dialog(dialog)
                     self.app.error(error)
                     return
-                self.page.close(dialog)
+                self.app.close_dialog(dialog)
                 self.app.show_fresh_start()
                 self.app.notify("All data was reset. Welcome to a new game.")
 
             dialog.actions = [
                 ft.TextButton("Cancel", on_click=cancel),
-                ft.FilledButton("Reset all data", on_click=reset),
+                ft.TextButton("Reset all data", on_click=reset, style=ft.ButtonStyle(color=BAD)),
             ]
-            self.page.open(dialog)
+            self.app.open_dialog(dialog)
 
         def cleanup_assets(_) -> None:
             try:
@@ -327,7 +340,7 @@ class SettingsView(View):
 
         self.body.controls = [
             self._worldhub_card(),
-            card(
+            _group(
                 ft.Column(
                     [
                         section_title("Sound"),
@@ -338,31 +351,32 @@ class SettingsView(View):
                     spacing=8,
                 )
             ),
-            card(
+            _group(
                 ft.Column(
                     [
                         section_title("Interface"),
                         animation_switch,
+                        boss_switch,
                         ft.Row([week_dropdown, background_dropdown], spacing=14),
                     ],
                     spacing=8,
                 )
             ),
-            card(
+            _group(
                 ft.Column(
                     [
                         section_title("Data"),
                         ft.Text(
                             f"Data directory: {container.config.data_dir}",
                             size=12,
-                            color=MUTED_TEXT,
+                            color=MUTED,
                             selectable=True,
                         ),
                         ft.Row(
                             [
-                                ft.FilledTonalButton("Create backup", on_click=create_backup),
-                                ft.FilledTonalButton("Restore backup…", on_click=restore_backup),
-                                ft.FilledTonalButton("Export JSON", on_click=export_json),
+                                ft.TextButton("Create backup", on_click=create_backup),
+                                ft.TextButton("Restore backup…", on_click=restore_backup),
+                                ft.TextButton("Export JSON", on_click=export_json),
                             ],
                             spacing=10,
                             wrap=True,

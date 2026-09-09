@@ -26,6 +26,9 @@ task-stamps = "task_stamps.app:run"
 # from World Hub's kit/ and verified against a lockfile. It is not edited here.
 where = ["src", "vendor/worldhub-kit/py"]
 
+[tool.setuptools.package-data]
+task_stamps = ["assets/fonts/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "vendor/worldhub-kit/py"]

@@ -10,7 +10,7 @@ def test_stats_aggregate_history_by_day_task_and_character(
     character = make_character(container, world.id, "Moss", source_files)
     task = make_task(container, "Read", EVERY_DAY)
 
-    results = complete_n_times(container, clock, task.id, 3)
+    complete_n_times(container, clock, task.id, 3)
     snapshot = container.stats_service.snapshot(7)
 
     assert snapshot.total == 3
@@ -22,7 +22,9 @@ def test_stats_aggregate_history_by_day_task_and_character(
     assert snapshot.current_run == 3
     assert snapshot.best_day is not None
     assert snapshot.best_day[1] == 1
-    assert snapshot.points == sum(result.reward_points for result in results)
+    # No streak milestone reached and no character in this world has Boss
+    # artwork, so nothing in the window earned a chest.
+    assert snapshot.chests_earned == 0
 
 
 def test_stats_ignore_reversed_completions(container, clock, source_files):

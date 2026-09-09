@@ -16,6 +16,9 @@ build/
 app_data/
 .local_data/
 assets/
+!src/task_stamps/assets/
+!src/task_stamps/assets/fonts/
+!src/task_stamps/assets/fonts/*
 database/
 backups/
 logs/

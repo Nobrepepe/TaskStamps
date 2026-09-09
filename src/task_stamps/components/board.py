@@ -11,6 +11,7 @@ from typing import Callable
 
 import flet as ft
 
+from task_stamps.components.theme import BOARD_FLOOR, LINE_INPUT, MUTED
 from task_stamps.domain.models import BoardStamp
 from task_stamps.services.board_service import BoardService
 
@@ -37,7 +38,6 @@ def stamp_control(
         rotate=ft.Rotate(math.radians(stamp.placement.rotation_degrees)),
         on_click=(lambda _, s=stamp: on_click(s)) if on_click else None,
         tooltip=f"{stamp.character_name_snapshot} — stamp {stamp.streak_number}",
-        border_radius=4,
     )
 
 
@@ -50,11 +50,28 @@ def build_board(
     on_board_click: Callable[[], None] | None = None,
     empty_hint: str | None = None,
 ) -> ft.Container:
-    children: list[ft.Control] = []
+    horizontal = ft.LinearGradient(
+        begin=ft.alignment.center_left,
+        end=ft.alignment.center_right,
+        colors=["#00f4ece1", LINE_INPUT, LINE_INPUT, "#00f4ece1"],
+        stops=[0, 0.13, 0.87, 1],
+    )
+    vertical = ft.LinearGradient(
+        begin=ft.alignment.top_center,
+        end=ft.alignment.bottom_center,
+        colors=["#00f4ece1", LINE_INPUT, LINE_INPUT, "#00f4ece1"],
+        stops=[0, 0.13, 0.87, 1],
+    )
+    children: list[ft.Control] = [
+        ft.Container(left=0, top=0, width=board_w, height=1, gradient=horizontal),
+        ft.Container(left=0, bottom=0, width=board_w, height=1, gradient=horizontal),
+        ft.Container(left=0, top=0, width=1, height=board_h, gradient=vertical),
+        ft.Container(right=0, top=0, width=1, height=board_h, gradient=vertical),
+    ]
     if not stamps and empty_hint:
         children.append(
             ft.Container(
-                content=ft.Text(empty_hint, color="#8A8880", size=14),
+                content=ft.Text(empty_hint, color=MUTED, size=14),
                 alignment=ft.alignment.center,
                 left=0,
                 top=0,
@@ -68,11 +85,9 @@ def build_board(
         content=ft.Stack(children, width=board_w, height=board_h),
         width=board_w,
         height=board_h,
-        bgcolor=background_color,
-        border=ft.border.all(1.5, "#C9C4B8"),
-        border_radius=12,
+        bgcolor=background_color or BOARD_FLOOR,
         shadow=ft.BoxShadow(
-            blur_radius=10, spread_radius=1, color="#14000000", offset=ft.Offset(0, 2)
+            blur_radius=26, color="#8C000000", blur_style=ft.ShadowBlurStyle.INNER
         ),
         on_click=(lambda _: on_board_click()) if on_board_click else None,
     )

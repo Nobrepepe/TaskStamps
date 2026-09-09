@@ -5,7 +5,6 @@ from __future__ import annotations
 from task_stamps.data.database import Database
 from task_stamps.data.repositories.assignments import AssignmentRepository
 from task_stamps.data.repositories.tasks import TaskRepository
-from task_stamps.data.repositories.vices import ViceRepository
 from task_stamps.domain.enums import (
     AssignmentEndReason,
     PoolType,
@@ -19,7 +18,6 @@ from task_stamps.domain.exceptions import (
 from task_stamps.domain.models import CharacterAssignment, HabitTask
 from task_stamps.services.assignment_service import AssignmentService
 from task_stamps.services.schedule_service import ScheduleService
-from task_stamps.services.reward_service import reward_for
 from task_stamps.utilities.clock import Clock
 from task_stamps.utilities.logging_setup import get_logger
 
@@ -35,7 +33,6 @@ class TaskService:
         assignments: AssignmentRepository,
         assignment_service: AssignmentService,
         schedule: ScheduleService,
-        vices: ViceRepository,
     ) -> None:
         self.db = db
         self.clock = clock
@@ -43,7 +40,6 @@ class TaskService:
         self.assignments = assignments
         self.assignment_service = assignment_service
         self.schedule = schedule
-        self.vices = vices
 
     def create_draft(
         self,
@@ -126,30 +122,16 @@ class TaskService:
             self.tasks.set_status(task_id, TaskStatus.ACTIVE)
             return assignment
 
-    def pause(self, task_id: str) -> int:
-        """Pause while retaining assignment/streak; return points deducted."""
+    def pause(self, task_id: str) -> None:
+        """Pause while retaining the assignment and streak. Paused dates are
+        stored as ranges and never count as missed, so pausing costs nothing."""
         self.schedule.evaluate_missed_days()
         with self.db.transaction():
             task = self.tasks.get(task_id)
             if task.status != TaskStatus.ACTIVE:
                 raise ValidationError("Only active tasks can be paused.")
-            deducted = 0
-            today = self.clock.today()
-            assignment = self.assignments.active_for_task(task_id)
-            if (
-                assignment is not None
-                and self.schedule.is_scheduled_on(task, today)
-                and not self.schedule.completions.exists_for_date(task.id, today)
-            ):
-                deducted = self.vices.charge_task_penalty(
-                    task.id,
-                    today,
-                    "scheduled_pause",
-                    reward_for(task.weight, assignment.current_streak + 1),
-                )
             self.tasks.open_pause(task_id, self.clock.today())
             self.tasks.set_status(task_id, TaskStatus.PAUSED)
-            return deducted
 
     def resume(self, task_id: str) -> None:
         """Resume with the same assignment and streak; the pause period is

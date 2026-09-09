@@ -16,6 +16,8 @@ def _row_to_character(row: sqlite3.Row) -> Character:
         name=row["name"],
         description=row["description"],
         portrait_asset_version_id=row["portrait_asset_version_id"],
+        boss_image_asset_version_id=row["boss_image_asset_version_id"],
+        boss_sound_asset_version_id=row["boss_sound_asset_version_id"],
         default_sound_asset_version_id=row["default_sound_asset_version_id"],
         status=CharacterStatus(row["status"]),
         is_archived=bool(row["is_archived"]),
@@ -81,12 +83,15 @@ class CharacterRepository(BaseRepository):
         description: str | None = None,
         world_id: str | None = None,
         portrait_asset_version_id: str | None = ...,  # type: ignore[assignment]
+        boss_image_asset_version_id: str | None = ...,  # type: ignore[assignment]
+        boss_sound_asset_version_id: str | None = ...,  # type: ignore[assignment]
         default_sound_asset_version_id: str | None = ...,  # type: ignore[assignment]
     ) -> Character:
         current = self.get(character_id)
         self.db.execute(
             "UPDATE characters SET name = ?, description = ?, world_id = ?, "
-            "portrait_asset_version_id = ?, default_sound_asset_version_id = ?, updated_at = ? "
+            "portrait_asset_version_id = ?, boss_image_asset_version_id = ?, "
+            "boss_sound_asset_version_id = ?, default_sound_asset_version_id = ?, updated_at = ? "
             "WHERE id = ?",
             (
                 name if name is not None else current.name,
@@ -95,6 +100,12 @@ class CharacterRepository(BaseRepository):
                 current.portrait_asset_version_id
                 if portrait_asset_version_id is ...
                 else portrait_asset_version_id,
+                current.boss_image_asset_version_id
+                if boss_image_asset_version_id is ...
+                else boss_image_asset_version_id,
+                current.boss_sound_asset_version_id
+                if boss_sound_asset_version_id is ...
+                else boss_sound_asset_version_id,
                 current.default_sound_asset_version_id
                 if default_sound_asset_version_id is ...
                 else default_sound_asset_version_id,
@@ -103,6 +114,14 @@ class CharacterRepository(BaseRepository):
             ),
         )
         return self.get(character_id)
+
+    def boss_pool(self) -> list[Character]:
+        rows = self.db.query_all(
+            "SELECT * FROM characters WHERE is_archived = 0 "
+            "AND boss_image_asset_version_id IS NOT NULL "
+            "ORDER BY created_at, id"
+        )
+        return [_row_to_character(row) for row in rows]
 
     def set_status(self, character_id: str, status: CharacterStatus) -> None:
         self.db.execute(

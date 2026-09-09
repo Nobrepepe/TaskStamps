@@ -5,16 +5,16 @@ from __future__ import annotations
 import flet as ft
 
 from task_stamps.components.common import (
-    MUTED_TEXT,
-    STATUS_COLORS,
-    card,
     confirm_dialog,
-    framed_image,
+    bleeding_image,
     portrait_image,
-    progress_dots,
+    progress_run,
     section_title,
     stamp_image,
-    status_chip,
+)
+from task_stamps.components.theme import (
+    BAD, BG_HOVER_ALPHA, MUTED, MUTED_2, SERIF, TEXT, TEXT_DIM,
+    eyebrow, hairline, style_dialog, text_action,
 )
 from task_stamps.domain.enums import (
     STAMPS_PER_CHARACTER,
@@ -32,10 +32,10 @@ class WorldsView(View):
     def build(self) -> ft.Control:
         self.selected_world_id: str | None = None
         self.header_host = ft.Container(
-            padding=ft.padding.only(left=24, right=24, top=18, bottom=8)
+            padding=ft.padding.only(left=56, right=56, top=40, bottom=20)
         )
         self.body_host = ft.Container(
-            expand=True, padding=ft.padding.only(left=24, right=24, bottom=20)
+            expand=True, padding=ft.padding.only(left=56, right=56, bottom=72)
         )
         return ft.Column([self.header_host, self.body_host], expand=True, spacing=0)
 
@@ -56,22 +56,20 @@ class WorldsView(View):
             header_action = ft.Text(
                 "Content is managed by World Hub — the library is read-only. "
                 "Updates arrive through Settings → World Hub content.",
-                size=12, color=MUTED_TEXT,
+                size=12, color=MUTED,
             )
         else:
-            header_action = ft.FilledButton(
-                "New world", icon=ft.Icons.ADD,
-                on_click=lambda _: self._open_world_editor(None),
-            )
+            header_action = text_action("Create a world →", lambda _: self._open_world_editor(None))
         self.header_host.content = ft.Row(
             [
-                ft.Text("Worlds", size=20, weight=ft.FontWeight.W_600),
+                ft.Column([eyebrow("Library"), ft.Text("Worlds", size=48, color=TEXT, font_family=SERIF),
+                           ft.Text("Browse the worlds and characters behind every stamp.", size=15, color=TEXT_DIM)], spacing=10),
                 ft.Container(expand=True),
                 header_action,
             ]
         )
         worlds = container.worlds.list()
-        cards = [self._world_card(world) for world in worlds]
+        cards = [self._world_item(world) for world in worlds]
         if not cards:
             cards.append(
                 ft.Container(
@@ -79,7 +77,7 @@ class WorldsView(View):
                     content=ft.Text(
                         "No worlds yet. Create one, then add characters with "
                         "a portrait and 15 stamps.",
-                        color=MUTED_TEXT,
+                        color=MUTED,
                     ),
                 )
             )
@@ -96,7 +94,7 @@ class WorldsView(View):
             scroll=ft.ScrollMode.AUTO,
         )
 
-    def _world_card(self, world: World) -> ft.Control:
+    def _world_item(self, world: World) -> ft.Control:
         container = self.app.container
         stats = container.characters.world_stats(world.id)
         cover_src = self.app.img_src(world.cover_asset_version_id)
@@ -106,15 +104,13 @@ class WorldsView(View):
         )
         body = ft.Column(
             [
-                framed_image(cover_src, 268, 4 / 3, icon=ft.Icons.PUBLIC_OUTLINED),
-                ft.Text(world.name, size=15, weight=ft.FontWeight.W_600),
-                ft.Text(world.description, size=12, color=MUTED_TEXT, max_lines=2),
-                ft.Text(counts, size=11, color=MUTED_TEXT),
+                bleeding_image(cover_src, 268, 4 / 3),
+                ft.Text(world.name, size=26, color=TEXT, font_family=SERIF),
+                ft.Text(world.description, size=13.5, color=TEXT_DIM, max_lines=2),
+                ft.Text(counts, size=12.5, color=MUTED_2),
                 ft.Row(
                     [
-                        ft.TextButton(
-                            "Open", on_click=lambda _, w=world: self._open_gallery(w.id)
-                        ),
+                        text_action("Open this world →", lambda _, w=world: self._open_gallery(w.id)),
                     ] + ([] if container.worldhub.hub_mode() else [
                         ft.TextButton(
                             "Edit", on_click=lambda _, w=world: self._open_world_editor(w)
@@ -122,7 +118,7 @@ class WorldsView(View):
                         ft.TextButton(
                             "Archive",
                             on_click=lambda _, w=world: self._archive_world(w),
-                            style=ft.ButtonStyle(color="#A65D57"),
+                            style=ft.ButtonStyle(color=BAD),
                         ),
                     ]),
                     spacing=0,
@@ -130,7 +126,7 @@ class WorldsView(View):
             ],
             spacing=6,
         )
-        return card(body)
+        return body
 
     def _open_world_editor(self, world: World | None) -> None:
         container = self.app.container
@@ -143,11 +139,10 @@ class WorldsView(View):
             min_lines=2,
         )
         cover_holder = ft.Container(
-            content=framed_image(
+            content=bleeding_image(
                 self.app.img_src(world.cover_asset_version_id) if world else None,
                 200,
                 4 / 3,
-                icon=ft.Icons.PUBLIC_OUTLINED,
             )
         )
 
@@ -170,7 +165,7 @@ class WorldsView(View):
                 except TaskStampsError as error:
                     self.app.error(error)
                     return
-                cover_holder.content = framed_image(
+                cover_holder.content = bleeding_image(
                     self.app.img_src(updated.cover_asset_version_id), 200, 4 / 3
                 )
                 self.page.update()
@@ -190,15 +185,15 @@ class WorldsView(View):
             except TaskStampsError as error:
                 self.app.error(error)
                 return
-            self.page.close(dialog)
+            self.app.close_dialog(dialog)
             self.refresh()
 
         dialog.actions = [
             ft.TextButton("Import cover…", on_click=import_cover),
-            ft.TextButton("Cancel", on_click=lambda _: self.page.close(dialog)),
-            ft.FilledButton("Save", on_click=save),
+            ft.TextButton("Cancel", on_click=lambda _: self.app.close_dialog(dialog)),
+            ft.TextButton("Save", on_click=save),
         ]
-        self.page.open(dialog)
+        self.app.open_dialog(dialog)
 
     def _archive_world(self, world: World) -> None:
         container = self.app.container
@@ -248,13 +243,8 @@ class WorldsView(View):
                 ),
                 ft.Text(world.name, size=20, weight=ft.FontWeight.W_600),
                 ft.Container(expand=True),
-                ft.Text(
-                    "Managed by World Hub — read-only.", size=12, color=MUTED_TEXT,
-                ) if container.worldhub.hub_mode() else ft.FilledButton(
-                    "New character",
-                    icon=ft.Icons.ADD,
-                    on_click=lambda _: self._create_character(world_id),
-                ),
+                ft.Text("Managed by World Hub — Boss media remains locally editable.", size=12, color=MUTED)
+                if container.worldhub.hub_mode() else text_action("Create a character →", lambda _: self._create_character(world_id)),
             ]
         )
         characters = container.characters.list(world_id=world_id)
@@ -263,7 +253,7 @@ class WorldsView(View):
             cards.append(
                 ft.Container(
                     padding=32,
-                    content=ft.Text("No characters in this world yet.", color=MUTED_TEXT),
+                    content=ft.Text("No characters in this world yet.", color=MUTED),
                 )
             )
         gallery = ft.Row(
@@ -296,17 +286,15 @@ class WorldsView(View):
                 ft.Row(
                     [
                         ft.Text(character.name, size=14, weight=ft.FontWeight.W_600),
-                        status_chip(
-                            character.status.value, STATUS_COLORS[character.status.value]
-                        ),
+                        ft.Text(character.status.value.capitalize(), size=12.5, color=TEXT_DIM),
                     ],
                     spacing=8,
                 ),
-                ft.Text(subtitle, size=11, color=MUTED_TEXT),
+                ft.Text(subtitle or ("Ready · all fifteen stamps present" if character.status == CharacterStatus.READY else "Draft · stamp images are still missing"), size=12.5, color=TEXT_DIM),
             ],
             spacing=6,
         )
-        return card(body, on_click=lambda _, c=character: self._open_profile(c.id))
+        return ft.Container(content=body, ink=True, on_click=lambda _, c=character: self._open_profile(c.id))
 
     def _create_character(self, world_id: str) -> None:
         name_field = ft.TextField(label="Name", width=320, autofocus=True)
@@ -324,15 +312,15 @@ class WorldsView(View):
             except TaskStampsError as error:
                 self.app.error(error)
                 return
-            self.page.close(dialog)
+            self.app.close_dialog(dialog)
             self.refresh()
             self._open_editor(character.id)
 
         dialog.actions = [
-            ft.TextButton("Cancel", on_click=lambda _: self.page.close(dialog)),
-            ft.FilledButton("Create", on_click=create),
+            ft.TextButton("Cancel", on_click=lambda _: self.app.close_dialog(dialog)),
+            ft.TextButton("Create", on_click=create),
         ]
-        self.page.open(dialog)
+        self.app.open_dialog(dialog)
 
     # ==== character profile ====================================================
 
@@ -362,7 +350,7 @@ class WorldsView(View):
                     f"{progress.current_streak}"
                 )
 
-        next_preview: ft.Control = ft.Text("—", color=MUTED_TEXT)
+        next_preview: ft.Control = ft.Text("—", color=MUTED)
         if progress.next_stamp_number and progress.assignment and progress.assignment.is_active:
             next_stamp = stamps[progress.next_stamp_number - 1]
             next_preview = stamp_image(
@@ -372,12 +360,11 @@ class WorldsView(View):
         grid_items: list[ft.Control] = []
         for stamp in stamps:
             state_opacity = 1.0
-            border_color = "#E2E0DB"
             if progress.assignment is not None and progress.assignment.is_active:
                 if stamp.sequence_number in progress.used_stamp_numbers:
-                    border_color = "#7C8B74"
+                    state_opacity = 1.0
                 elif stamp.sequence_number == progress.next_stamp_number:
-                    border_color = "#C2A36B"
+                    state_opacity = 0.72
                 else:
                     state_opacity = 0.45
             item = ft.Container(
@@ -386,14 +373,12 @@ class WorldsView(View):
                         stamp_image(
                             self.app.img_src(stamp.image_asset_version_id), width=82
                         ),
-                        ft.Text(str(stamp.sequence_number), size=11, color=MUTED_TEXT),
+                        ft.Text(str(stamp.sequence_number), size=11, color=MUTED),
                     ],
                     spacing=2,
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 opacity=state_opacity,
-                border=ft.border.all(2, border_color),
-                border_radius=8,
                 padding=3,
                 ink=True,
                 on_click=lambda _, sequence=stamp.sequence_number: (
@@ -401,7 +386,7 @@ class WorldsView(View):
                         character_id,
                         sequence,
                         lambda: (
-                            self.page.close(dialog),
+                            self.app.close_dialog(dialog),
                             self._open_profile(character_id),
                         ),
                     )
@@ -420,11 +405,11 @@ class WorldsView(View):
                 ft.Text(
                     f"'{task.name}': {outcome}, streak {assignment.current_streak}",
                     size=13,
-                    color=MUTED_TEXT,
+                    color=MUTED,
                 )
             )
         if not history_rows:
-            history_rows.append(ft.Text("Never assigned yet.", size=13, color=MUTED_TEXT))
+            history_rows.append(ft.Text("Never assigned yet.", size=13, color=MUTED))
 
         portrait_panel = ft.Container(
             content=portrait_image(
@@ -443,16 +428,18 @@ class WorldsView(View):
                             weight=ft.FontWeight.W_600,
                             expand=True,
                         ),
-                        status_chip(
-                            character.status.value,
-                            STATUS_COLORS[character.status.value],
-                        ),
+                        ft.Text(character.status.value.capitalize(), size=13, color=TEXT_DIM),
                     ],
                     spacing=10,
                 ),
-                ft.Text(world.name, size=14, color=MUTED_TEXT),
-                ft.Text(character.description, size=14, color=MUTED_TEXT),
+                ft.Text(world.name, size=14, color=MUTED),
+                ft.Text(character.description, size=14, color=MUTED),
                 ft.Text(assignment_line, size=14),
+                section_title("Boss banner media"),
+                self._boss_media_controls(
+                    character_id,
+                    lambda: (self.app.close_dialog(dialog), self._open_profile(character_id)),
+                ),
                 ft.Row(
                     [
                         ft.Column(
@@ -463,11 +450,7 @@ class WorldsView(View):
                         ft.Column(
                             [
                                 section_title("Collection progress"),
-                                progress_dots(
-                                    progress.used_stamp_numbers,
-                                    progress.next_stamp_number,
-                                    size=16,
-                                ),
+                                progress_run(progress.used_stamp_numbers, progress.next_stamp_number),
                             ],
                             spacing=6,
                             expand=True,
@@ -512,7 +495,7 @@ class WorldsView(View):
                 except TaskStampsError as error:
                     self.app.error(error)
                     return
-                self.page.close(dialog)
+                self.app.close_dialog(dialog)
                 self.app.notify(f"'{character.name}' archived.")
                 self.refresh()
 
@@ -520,18 +503,18 @@ class WorldsView(View):
 
         if container.worldhub.hub_mode():
             dialog.actions = [
-                ft.TextButton("Close", on_click=lambda _: self.page.close(dialog)),
+                ft.TextButton("Close", on_click=lambda _: self.app.close_dialog(dialog)),
             ]
         else:
             dialog.actions = [
                 ft.TextButton("Archive", on_click=archive, style=ft.ButtonStyle(color="#A65D57")),
                 ft.TextButton(
                     "Edit",
-                    on_click=lambda _: (self.page.close(dialog), self._open_editor(character_id)),
+                    on_click=lambda _: (self.app.close_dialog(dialog), self._open_editor(character_id)),
                 ),
-                ft.TextButton("Close", on_click=lambda _: self.page.close(dialog)),
+                ft.TextButton("Close", on_click=lambda _: self.app.close_dialog(dialog)),
             ]
-        self.page.open(dialog)
+        self.app.open_dialog(dialog)
 
     def _open_profile_stamp_dialog(
         self, character_id: str, sequence: int, on_close
@@ -549,7 +532,7 @@ class WorldsView(View):
         def rebuild() -> None:
             stamp = container.characters.stamp_by_sequence(character_id, sequence)
             if stamp is None:
-                self.page.close(dialog)
+                self.app.close_dialog(dialog)
                 return
 
             def import_image(_) -> None:
@@ -586,12 +569,12 @@ class WorldsView(View):
                 )
 
             controls: list[ft.Control] = [
-                ft.FilledTonalButton(
+                ft.TextButton(
                     "Upload image…",
                     icon=ft.Icons.UPLOAD_OUTLINED,
                     on_click=import_image,
                 ),
-                ft.FilledTonalButton(
+                ft.TextButton(
                     "Upload sound…",
                     icon=ft.Icons.MUSIC_NOTE_OUTLINED,
                     on_click=import_sound,
@@ -623,7 +606,7 @@ class WorldsView(View):
                         if stamp.sound_asset_version_id
                         else "No unique sound assigned",
                         size=13,
-                        color=MUTED_TEXT,
+                        color=MUTED,
                     ),
                     ft.Row(controls, spacing=8, wrap=True),
                 ],
@@ -633,14 +616,57 @@ class WorldsView(View):
             self.page.update()
 
         def close(_) -> None:
-            self.page.close(dialog)
+            self.app.close_dialog(dialog)
             on_close()
 
         dialog.actions = [ft.TextButton("Close", on_click=close)]
         rebuild()
-        self.page.open(dialog)
+        self.app.open_dialog(dialog)
 
     # ==== character editor =======================================================
+
+    def _boss_media_controls(self, character_id: str, rebuild) -> ft.Control:
+        character = self.app.container.characters.get(character_id)
+        library = self.app.container.library_service
+
+        def import_image(_) -> None:
+            self.app.pick_file(
+                _IMAGE_EXTS,
+                lambda path: self._safe(lambda: library.import_boss_image(character_id, path), rebuild),
+            )
+
+        def import_sound(_) -> None:
+            self.app.pick_file(
+                _SOUND_EXTS,
+                lambda path: self._safe(lambda: library.import_boss_sound(character_id, path), rebuild),
+            )
+
+        actions: list[ft.Control] = [
+            ft.TextButton("Import Boss image…", on_click=import_image),
+            ft.TextButton("Import defeat sound…", on_click=import_sound),
+        ]
+        if character.boss_image_asset_version_id:
+            actions.append(ft.TextButton("Remove Boss image", on_click=lambda _: self._safe(
+                lambda: library.remove_boss_image(character_id), rebuild)))
+        if character.boss_sound_asset_version_id:
+            actions.extend([
+                ft.TextButton("Test defeat sound", on_click=lambda _: self.app.play_sound_version(
+                    character.boss_sound_asset_version_id, force=True)),
+                ft.TextButton("Remove defeat sound", on_click=lambda _: self._safe(
+                    lambda: library.remove_boss_sound(character_id), rebuild)),
+            ])
+        preview = bleeding_image(
+            self.app.img_src(character.boss_image_asset_version_id), 320, 16 / 9, glow=False
+        )
+        return ft.Column([
+            preview,
+            ft.Text(
+                "In the daily rotation." if character.boss_image_asset_version_id
+                else "No Boss art — this character is not in the daily rotation.",
+                size=12.5, color=TEXT_DIM,
+            ),
+            ft.Row(actions, wrap=True, spacing=6),
+        ], spacing=8)
 
     def _open_editor(self, character_id: str) -> None:
         container = self.app.container
@@ -652,12 +678,12 @@ class WorldsView(View):
             self.page.update()
 
         def close(_) -> None:
-            self.page.close(dialog)
+            self.app.close_dialog(dialog)
             self.refresh()
 
         dialog.actions = [ft.TextButton("Done", on_click=close)]
         content_host.content = self._build_editor_content(character_id, rebuild)
-        self.page.open(dialog)
+        self.app.open_dialog(dialog)
 
     def _build_editor_content(self, character_id: str, rebuild) -> ft.Control:
         container = self.app.container
@@ -740,7 +766,7 @@ class WorldsView(View):
                             [section_title("Default sound"), *sound_controls],
                             spacing=4,
                         ),
-                        ft.FilledButton("Save details", on_click=save_fields),
+                        ft.TextButton("Save details", on_click=save_fields),
                     ],
                     spacing=8,
                 ),
@@ -750,7 +776,7 @@ class WorldsView(View):
         )
 
         readiness = (
-            ft.Text("Ready — all 15 stamps present.", size=12, color="#7C8B74")
+            ft.Text("Ready — all 15 stamps present.", size=12, color=TEXT_DIM)
             if character.status == CharacterStatus.READY
             else ft.Text(
                 f"Draft — {missing} stamp image{'s' if missing != 1 else ''} still missing. "
@@ -774,6 +800,7 @@ class WorldsView(View):
         return ft.Column(
             [
                 header,
+                self._boss_media_controls(character_id, rebuild),
                 readiness,
                 section_title("Stamps (15 required, landscape 4:3)"),
                 stamp_grid,
@@ -835,15 +862,14 @@ class WorldsView(View):
         return ft.Container(
             content=ft.Column(
                 [
-                    ft.Text(f"#{sequence}", size=11, color=MUTED_TEXT),
+                    ft.Text(f"#{sequence}", size=11, color=MUTED),
                     stamp_image(self.app.img_src(stamp.image_asset_version_id), width=144),
                     ft.Row(buttons, spacing=0),
                 ],
                 spacing=3,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            border=ft.border.all(2, "#E2E0DB" if has_image else "#C97B72"),
-            border_radius=8,
+            opacity=1.0 if has_image else 0.5,
             padding=6,
             tooltip=None if has_image else "Required image missing",
         )

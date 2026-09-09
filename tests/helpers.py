@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from task_stamps.container import AppContainer
-from task_stamps.domain.enums import STAMPS_PER_CHARACTER, PoolType
+from task_stamps.domain.enums import STAMPS_PER_CHARACTER, PoolType, TaskWeight
 from task_stamps.domain.models import Character, HabitTask, World
 from task_stamps.services.completion_service import CompletionResult
 from task_stamps.utilities.clock import FixedClock
@@ -58,9 +58,10 @@ def make_task(
     pool_type: PoolType = PoolType.ALL_WORLDS,
     world_id: str | None = None,
     activate: bool = True,
+    weight: TaskWeight = TaskWeight.MEDIUM,
 ) -> HabitTask:
     task = container.task_service.create_draft(
-        name, "", weekdays_to_mask(weekdays), pool_type, world_id
+        name, "", weekdays_to_mask(weekdays), pool_type, world_id, weight
     )
     if activate:
         container.task_service.activate(task.id)

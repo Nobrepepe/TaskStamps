@@ -25,17 +25,20 @@ from task_stamps.domain.exceptions import (
     TaskNotActiveError,
     TaskPausedError,
     UndoNotAllowedError,
+    ValidationError,
 )
 from task_stamps.domain.models import (
     CharacterAssignment,
     HabitTask,
     StampPlacement,
     TaskCompletion,
+    ViceChest,
 )
 from task_stamps.services.assignment_service import AssignmentService
 from task_stamps.services.board_service import BoardService
+from task_stamps.services.boss_service import BossService
+from task_stamps.services.chest_service import ChestService
 from task_stamps.services.schedule_service import ScheduleService
-from task_stamps.services.reward_service import reward_for
 from task_stamps.utilities.clock import Clock
 from task_stamps.utilities.logging_setup import get_logger
 
@@ -62,7 +65,8 @@ class CompletionResult:
     assignment_completed: bool  # stamp 15 finished the run
     new_assignment: CharacterAssignment | None
     task_deactivated: bool  # no replacement character existed
-    reward_points: int
+    chest: ViceChest | None  # streak 5/10/15 earned a chest
+    boss_chest_granted: bool  # this completion defeated today's Boss
 
 
 class CompletionService:
@@ -79,6 +83,8 @@ class CompletionService:
         schedule: ScheduleService,
         assignment_service: AssignmentService,
         board: BoardService,
+        boss: BossService,
+        chest_service: ChestService,
     ) -> None:
         self.db = db
         self.clock = clock
@@ -91,6 +97,8 @@ class CompletionService:
         self.schedule = schedule
         self.assignment_service = assignment_service
         self.board = board
+        self.boss = boss
+        self.chest_service = chest_service
 
     # -- queries ---------------------------------------------------------
 
@@ -157,8 +165,6 @@ class CompletionService:
             sound_version_id = (
                 stamp.sound_asset_version_id or character.default_sound_asset_version_id
             )
-            reward_points = reward_for(task.weight, new_streak)
-
             completion = self.completions.create(
                 task_id=task.id,
                 assignment_id=assignment.id,
@@ -169,13 +175,21 @@ class CompletionService:
                 task_name_snapshot=task.name,
                 character_name_snapshot=character.name,
                 world_name_snapshot=world.name,
-                reward_points=reward_points,
             )
             placement = self.board.create_placement(
                 completion_id=completion.id,
                 board_date=today,
                 image_asset_version_id=stamp.image_asset_version_id,
                 sound_asset_version_id=sound_version_id,
+            )
+            chest = self.chest_service.grant_for_completion(
+                task.weight, new_streak, completion.id
+            )
+            # The Boss is defeated when today's board holds every stamp the day
+            # asks for; the grant is idempotent, so the insert *is* the event.
+            boss = self.boss.daily_boss(today)
+            boss_chest = self.chest_service.grant_boss_chest_if_defeated(
+                today, boss is not None and boss.defeated
             )
 
             assignment_completed = new_streak >= STAMPS_PER_CHARACTER
@@ -214,7 +228,8 @@ class CompletionService:
                 assignment_completed=assignment_completed,
                 new_assignment=new_assignment,
                 task_deactivated=task_deactivated,
-                reward_points=reward_points,
+                chest=chest,
+                boss_chest_granted=boss_chest is not None,
             )
 
     # -- undo --------------------------------------------------------------
@@ -236,19 +251,10 @@ class CompletionService:
                 raise UndoNotAllowedError(
                     "Only completions made today can be undone; earlier boards are read-only."
                 )
-            balance_row = self.db.query_one(
-                "SELECT "
-                "COALESCE((SELECT SUM(reward_points) FROM task_completions "
-                "WHERE is_reversed = 0), 0) - "
-                "COALESCE((SELECT SUM(price_paid) FROM vice_claims), 0) - "
-                "COALESCE((SELECT SUM(points_deducted) FROM task_penalties), 0) AS balance"
-            )
-            balance = int(balance_row["balance"]) if balance_row else 0
-            if completion.reward_points > balance:
-                raise UndoNotAllowedError(
-                    "This completion's points have already been spent in the Vice Shop, "
-                    "so it cannot be undone."
-                )
+            try:
+                self.chest_service.revoke_for_completion(completion.id)
+            except ValidationError as error:
+                raise UndoNotAllowedError(error.user_message) from error
             assignment = self.assignments.get(completion.assignment_id)
 
             if completion.streak_number < STAMPS_PER_CHARACTER:
@@ -264,6 +270,13 @@ class CompletionService:
                 )
             else:
                 self._undo_stamp_fifteen(completion, assignment)
+            # Removing a stamp can un-defeat the Boss; the day's chest goes with it.
+            boss = self.boss.daily_boss(today)
+            if boss is None or not boss.defeated:
+                try:
+                    self.chest_service.revoke_boss_chest(today)
+                except ValidationError as error:
+                    raise UndoNotAllowedError(error.user_message) from error
             logger.info("Reversed completion %s", completion_id)
 
     def _undo_stamp_fifteen(

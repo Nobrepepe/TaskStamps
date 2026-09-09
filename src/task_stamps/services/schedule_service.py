@@ -14,11 +14,10 @@ from task_stamps.data.repositories.state import (
     AppStateRepository,
 )
 from task_stamps.data.repositories.tasks import TaskRepository
-from task_stamps.data.repositories.vices import ViceRepository
+from task_stamps.data.repositories.misses import MissRepository
 from task_stamps.domain.enums import AssignmentEndReason, TaskStatus
 from task_stamps.domain.exceptions import NoEligibleCharacterError
 from task_stamps.domain.models import HabitTask, PausePeriod
-from task_stamps.services.reward_service import reward_for
 from task_stamps.utilities.clock import Clock
 from task_stamps.utilities.dates import date_range, mask_matches
 from task_stamps.utilities.logging_setup import get_logger
@@ -33,7 +32,6 @@ class DropEvent:
     old_character_id: str
     dropped_due_date: date
     new_character_id: str | None  # None when no replacement was available
-    points_deducted: int = 0
     auto_paused: bool = False
 
 
@@ -55,7 +53,7 @@ class ScheduleService:
         assignments: AssignmentRepository,
         completions: CompletionRepository,
         state: AppStateRepository,
-        vices: ViceRepository,
+        misses: MissRepository,
     ) -> None:
         self.db = db
         self.clock = clock
@@ -63,7 +61,7 @@ class ScheduleService:
         self.assignments = assignments
         self.completions = completions
         self.state = state
-        self.vices = vices
+        self.misses = misses
         # Set lazily by the container to avoid a hard construction cycle
         # with AssignmentService.
         self.assignment_service = None  # type: ignore[assignment]
@@ -137,20 +135,11 @@ class ScheduleService:
         if not missed:
             return None
 
-        # Every scheduled failure is charged. Once the third consecutive
+        # Every scheduled failure is recorded. Once the third consecutive
         # miss is reached, pausing makes later dates in this batch irrelevant.
-        points_deducted = 0
-        consecutive = self.vices.consecutive_misses(task.id)
-        considered: list[date] = []
+        consecutive = self.misses.consecutive_misses(task.id)
         for missed_date in missed:
-            theoretical = reward_for(
-                task.weight,
-                assignment.current_streak + 1 if not considered else 1,
-            )
-            points_deducted += self.vices.charge_task_penalty(
-                task.id, missed_date, "missed", theoretical
-            )
-            considered.append(missed_date)
+            self.misses.record(task.id, missed_date)
             consecutive += 1
             if consecutive >= 3:
                 break
@@ -190,7 +179,6 @@ class ScheduleService:
             old_character_id=assignment.character_id,
             dropped_due_date=first_missed,
             new_character_id=new_character_id,
-            points_deducted=points_deducted,
             auto_paused=auto_paused,
         )
 

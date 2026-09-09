@@ -13,11 +13,15 @@ from task_stamps.utilities.ids import new_id
 _REFERENCING_COLUMNS: tuple[tuple[str, str], ...] = (
     ("worlds", "cover_asset_version_id"),
     ("characters", "portrait_asset_version_id"),
+    ("characters", "boss_image_asset_version_id"),
+    ("characters", "boss_sound_asset_version_id"),
     ("characters", "default_sound_asset_version_id"),
     ("character_stamps", "image_asset_version_id"),
     ("character_stamps", "sound_asset_version_id"),
     ("stamp_placements", "image_asset_version_id"),
     ("stamp_placements", "sound_asset_version_id"),
+    ("daily_bosses", "image_asset_version_id"),
+    ("daily_bosses", "sound_asset_version_id"),
 )
 
 

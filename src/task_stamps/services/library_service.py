@@ -140,6 +140,28 @@ class LibraryService:
             character_id, portrait_asset_version_id=version.id
         )
 
+    def import_boss_image(self, character_id: str, source: Path | str) -> Character:
+        character = self.characters.get(character_id)
+        version = self.assets.replace_version(
+            character.boss_image_asset_version_id,
+            source,
+            AssetType.BOSS_IMAGE,
+        )
+        return self.characters.update(character_id, boss_image_asset_version_id=version.id)
+
+    def remove_boss_image(self, character_id: str) -> Character:
+        return self.characters.update(character_id, boss_image_asset_version_id=None)
+
+    def import_boss_sound(self, character_id: str, source: Path | str) -> Character:
+        character = self.characters.get(character_id)
+        version = self.assets.replace_version(
+            character.boss_sound_asset_version_id, source, AssetType.SOUND
+        )
+        return self.characters.update(character_id, boss_sound_asset_version_id=version.id)
+
+    def remove_boss_sound(self, character_id: str) -> Character:
+        return self.characters.update(character_id, boss_sound_asset_version_id=None)
+
     def import_default_sound(self, character_id: str, source: Path | str) -> Character:
         character = self.characters.get(character_id)
         version = self.assets.replace_version(

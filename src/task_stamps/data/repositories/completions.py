@@ -21,7 +21,6 @@ def _row_to_completion(row: sqlite3.Row) -> TaskCompletion:
         task_name_snapshot=row["task_name_snapshot"],
         character_name_snapshot=row["character_name_snapshot"],
         world_name_snapshot=row["world_name_snapshot"],
-        reward_points=row["reward_points"],
         is_reversed=bool(row["is_reversed"]),
         reversed_at=opt_datetime(row["reversed_at"]),
     )
@@ -40,14 +39,13 @@ class CompletionRepository(BaseRepository):
         task_name_snapshot: str,
         character_name_snapshot: str,
         world_name_snapshot: str,
-        reward_points: int,
     ) -> TaskCompletion:
         completion_id = new_id()
         self.db.execute(
             "INSERT INTO task_completions(id, task_id, assignment_id, character_id, stamp_id, "
             "completion_date, completed_at, streak_number, task_name_snapshot, "
-            "character_name_snapshot, world_name_snapshot, reward_points, is_reversed) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+            "character_name_snapshot, world_name_snapshot, is_reversed) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
             (
                 completion_id,
                 task_id,
@@ -60,7 +58,6 @@ class CompletionRepository(BaseRepository):
                 task_name_snapshot,
                 character_name_snapshot,
                 world_name_snapshot,
-                reward_points,
             ),
         )
         return self.get(completion_id)

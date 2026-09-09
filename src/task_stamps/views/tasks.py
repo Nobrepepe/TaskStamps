@@ -5,13 +5,13 @@ from __future__ import annotations
 import flet as ft
 
 from task_stamps.components.common import (
-    MUTED_TEXT,
-    STATUS_COLORS,
-    card,
     portrait_image,
-    progress_dots,
+    progress_run,
     section_title,
-    status_chip,
+)
+from task_stamps.components.theme import (
+    BAD, BG, BG_HOVER_ALPHA, MUTED, MUTED_2, SERIF, TEXT, TEXT_DIM,
+    eyebrow, hairline, style_dialog, text_action,
 )
 from task_stamps.domain.enums import WEEKDAY_SHORT, PoolType, TaskStatus, TaskWeight
 from task_stamps.domain.exceptions import TaskStampsError
@@ -34,34 +34,26 @@ class TasksView(View):
         self.world_dropdown = ft.Dropdown(
             value="*", width=200, on_change=lambda _: self.refresh(), label="Pool"
         )
-        self.grid = ft.GridView(
+        self.rows = ft.Column(spacing=0)
+        self.content_host = ft.Container(content=self.rows)
+        header = ft.Row(
+            [
+                ft.Column([
+                    eyebrow("Library"),
+                    ft.Text("Tasks", size=48, color=TEXT, font_family=SERIF,
+                            style=ft.TextStyle(height=1.04)),
+                    ft.Text("Recurring work and the characters carrying it.", size=15, color=TEXT_DIM),
+                ], spacing=10, expand=True),
+                text_action("Create a task →", lambda _: self.open_editor(None), size=14),
+            ],
+            vertical_alignment=ft.CrossAxisAlignment.END,
+        )
+        filters = ft.Row([self.filter_dropdown, self.world_dropdown], spacing=20)
+        return ft.Container(
+            content=ft.Column([header, filters, self.content_host], spacing=28, scroll=ft.ScrollMode.AUTO),
+            padding=ft.padding.only(left=56, right=56, top=40, bottom=72),
             expand=True,
-            max_extent=480,
-            child_aspect_ratio=2.4,
-            spacing=16,
-            run_spacing=16,
-            padding=ft.padding.only(bottom=24),
         )
-        self.content_host = ft.Container(content=self.grid, expand=True)
-        header = ft.Container(
-            padding=ft.padding.only(left=24, right=24, top=18, bottom=8),
-            content=ft.Row(
-                [
-                    ft.Text("Tasks", size=20, weight=ft.FontWeight.W_600),
-                    ft.Container(expand=True),
-                    self.filter_dropdown,
-                    self.world_dropdown,
-                    ft.FilledButton(
-                        "New task", icon=ft.Icons.ADD, on_click=lambda _: self.open_editor(None)
-                    ),
-                ],
-                spacing=12,
-            ),
-        )
-        body = ft.Container(
-            padding=ft.padding.symmetric(horizontal=24), content=self.content_host, expand=True
-        )
-        return ft.Column([header, body], expand=True, spacing=0)
 
     # -- list ---------------------------------------------------------------
 
@@ -96,18 +88,18 @@ class TasksView(View):
                 continue
             if selected_world not in ("*", "all") and task.world_id != selected_world:
                 continue
-            rows.append(self._task_card(task))
+            rows.extend([self._task_row(task), hairline()])
         if rows:
-            self.grid.controls = rows
-            self.content_host.content = self.grid
+            self.rows.controls = [hairline(), *rows]
+            self.content_host.content = self.rows
         else:
             self.content_host.content = ft.Container(
                 padding=32,
-                content=ft.Text("No tasks match this filter.", color=MUTED_TEXT),
+                content=ft.Text("No tasks match this filter.", color=MUTED),
             )
         self.page.update()
 
-    def _task_card(self, task: HabitTask) -> ft.Control:
+    def _task_row(self, task: HabitTask) -> ft.Control:
         container = self.app.container
         today = container.clock.today()
         progress = container.streak_service.task_progress(task.id)
@@ -134,55 +126,43 @@ class TasksView(View):
             else ""
         )
 
+        state_note = task.description or (
+            "Paused days never count as missed." if task.status == TaskStatus.PAUSED
+            else "Activate it and a character will be drawn from its selected pool."
+            if task.status == TaskStatus.DRAFT else ""
+        )
+        dim = MUTED if task.status in (TaskStatus.DRAFT, TaskStatus.PAUSED) else TEXT_DIM
         info = ft.Column(
             [
-                ft.Row(
-                    [
-                        ft.Text(
-                            task.name,
-                            size=16,
-                            weight=ft.FontWeight.W_600,
-                            expand=True,
-                            no_wrap=False,
-                        ),
-                    ],
-                    spacing=8,
-                ),
-                status_chip(task.status.value, STATUS_COLORS[task.status.value]),
-                ft.Text(
-                    f"{task.weight.value.title()} weight",
-                    size=12,
-                    color=MUTED_TEXT,
-                ),
-                ft.Text(
-                    f"{mask_label(task.weekday_mask)} · {character_name}",
-                    size=12,
-                    color=MUTED_TEXT,
-                ),
-                ft.Text(
-                    f"streak {progress.current_streak}/15",
-                    size=12,
-                    color=MUTED_TEXT,
-                ),
-                ft.Text(
-                    " · ".join(part for part in (today_status, next_label) if part),
-                    size=12,
-                    color=MUTED_TEXT,
-                ),
+                ft.Text(task.name, size=25, color=TEXT if task.status == TaskStatus.ACTIVE else TEXT_DIM,
+                        font_family=SERIF),
+                ft.Text(f"{today_status} · {mask_label(task.weekday_mask)} · held by {character_name} · "
+                        f"{task.weight.value.title()} weight", size=13.5, color=dim),
+                ft.Text(state_note, size=13, color=MUTED_2),
             ],
-            spacing=4,
+            spacing=5,
             expand=True,
-            alignment=ft.MainAxisAlignment.CENTER,
         )
-        return card(
-            ft.Row(
-                [portrait_image(portrait_src, width=112), info],
-                spacing=14,
-                expand=True,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
+        right: ft.Control = (
+            text_action("Activate →", lambda _, task_id=task.id: self.open_detail(task_id))
+            if task.status == TaskStatus.DRAFT else
+            ft.Column([
+                ft.Text(spans=[ft.TextSpan(str(progress.current_streak), ft.TextStyle(font_family=SERIF, size=22, color=TEXT)),
+                               ft.TextSpan(" / 15", ft.TextStyle(font_family=SERIF, size=22, color="#6f645c"))],
+                        text_align=ft.TextAlign.RIGHT),
+                progress_run(progress.used_stamp_numbers, progress.next_stamp_number),
+                ft.Text(next_label, size=12, color=MUTED_2),
+            ], spacing=8, horizontal_alignment=ft.CrossAxisAlignment.END, width=168)
+        )
+        row = ft.Container(
+            padding=ft.padding.symmetric(vertical=22),
+            ink=True,
             on_click=lambda _, t=task: self.open_detail(t.id),
+            content=ft.Row([portrait_image(portrait_src, width=66), info, right], spacing=26,
+                           vertical_alignment=ft.CrossAxisAlignment.CENTER),
         )
+        row.on_hover = lambda e: setattr(e.control, "bgcolor", BG_HOVER_ALPHA if e.data == "true" else None) or e.control.update()
+        return row
 
     # -- editor ---------------------------------------------------------------
 
@@ -205,8 +185,8 @@ class TasksView(View):
                 selected_days.discard(day)
             else:
                 selected_days.add(day)
-            control.bgcolor = "#7C8B74" if day in selected_days else "#EDECE7"
-            control.content.color = "#FFFFFF" if day in selected_days else "#55534E"
+            control.bgcolor = TEXT if day in selected_days else None
+            control.content.color = BG if day in selected_days else TEXT_DIM
             self.page.update()
 
         for day, label in enumerate(WEEKDAY_SHORT):
@@ -214,9 +194,9 @@ class TasksView(View):
                 content=ft.Text(
                     label,
                     size=12,
-                    color="#FFFFFF" if day in selected_days else "#55534E",
+                    color=BG if day in selected_days else TEXT_DIM,
                 ),
-                bgcolor="#7C8B74" if day in selected_days else "#EDECE7",
+                bgcolor=TEXT if day in selected_days else None,
                 padding=ft.padding.symmetric(horizontal=10, vertical=6),
                 border_radius=8,
             )
@@ -247,7 +227,7 @@ class TasksView(View):
             ],
         )
 
-        dialog = ft.AlertDialog(
+        dialog = style_dialog(ft.AlertDialog(
             modal=True,
             title=ft.Text("Edit task" if task else "New task"),
             content=ft.Column(
@@ -263,7 +243,7 @@ class TasksView(View):
                 spacing=14,
                 width=400,
             ),
-        )
+        ))
 
         def pool_values() -> tuple[PoolType, str | None]:
             value = pool_dropdown.value or "all"
@@ -295,10 +275,10 @@ class TasksView(View):
                     )
                 if activate:
                     assignment = container.task_service.activate(saved.id)
-                    self.page.close(dialog)
+                    self.app.close_dialog(dialog)
                     self._show_assignment_result(saved.name, assignment.character_id)
                 else:
-                    self.page.close(dialog)
+                    self.app.close_dialog(dialog)
                     self.app.notify("Task saved.")
             except TaskStampsError as error:
                 self.app.error(error)
@@ -306,22 +286,22 @@ class TasksView(View):
             self.refresh()
 
         actions: list[ft.Control] = [
-            ft.TextButton("Cancel", on_click=lambda _: self.page.close(dialog)),
+            ft.TextButton("Cancel", on_click=lambda _: self.app.close_dialog(dialog)),
             ft.TextButton("Save as draft", on_click=lambda _: save(False)),
         ]
         if task is None or task.status == TaskStatus.DRAFT:
-            actions.append(ft.FilledButton("Save & activate", on_click=lambda _: save(True)))
+            actions.append(ft.TextButton("Save & activate", on_click=lambda _: save(True)))
         else:
-            actions[1] = ft.FilledButton("Save", on_click=lambda _: save(False))
+            actions[1] = ft.TextButton("Save", on_click=lambda _: save(False))
         dialog.actions = actions
-        self.page.open(dialog)
+        self.app.open_dialog(dialog)
 
     def _show_assignment_result(self, task_name: str, character_id: str) -> None:
         """Shows which character was randomly drawn. There is deliberately no
         reroll button — assignments persist once made."""
         character = self.app.container.characters.get(character_id)
         src = self.app.img_src(character.portrait_asset_version_id)
-        dialog = ft.AlertDialog(
+        dialog = style_dialog(ft.AlertDialog(
             title=ft.Text("Task activated"),
             content=ft.Column(
                 [
@@ -329,16 +309,16 @@ class TasksView(View):
                     ft.Text(character.name, size=16, weight=ft.FontWeight.W_600),
                     ft.Text(
                         f"will collect stamps for '{task_name}'.",
-                        color=MUTED_TEXT,
+                        color=MUTED,
                     ),
                 ],
                 tight=True,
                 spacing=8,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-        )
-        dialog.actions = [ft.TextButton("OK", on_click=lambda _: self.page.close(dialog))]
-        self.page.open(dialog)
+        ))
+        dialog.actions = [ft.TextButton("Close", on_click=lambda _: self.app.close_dialog(dialog))]
+        self.app.open_dialog(dialog)
 
     # -- detail ---------------------------------------------------------------
 
@@ -350,7 +330,7 @@ class TasksView(View):
 
         portrait_src: str | None = None
         character_info: ft.Control = ft.Text(
-            "No character assigned.", size=14, color=MUTED_TEXT
+            "No character assigned.", size=14, color=MUTED
         )
         if progress.assignment is not None and progress.assignment.is_active:
             character = container.characters.get(progress.assignment.character_id)
@@ -364,7 +344,7 @@ class TasksView(View):
                         f"Streak {progress.current_streak}/15 · since "
                         f"{progress.assignment.started_on.strftime('%d %b %Y')}",
                         size=14,
-                        color=MUTED_TEXT,
+                        color=MUTED,
                     ),
                 ],
                 spacing=3,
@@ -374,13 +354,12 @@ class TasksView(View):
         completion_rows = [
             ft.Text(
                 f"{completion.completion_date.strftime('%d %b %Y')} — stamp "
-                f"{completion.streak_number} ({completion.character_name_snapshot}) · "
-                f"+{completion.reward_points} points",
+                f"{completion.streak_number} ({completion.character_name_snapshot})",
                 size=13,
-                color=MUTED_TEXT,
+                color=MUTED,
             )
             for completion in completions
-        ] or [ft.Text("No completions yet.", size=13, color=MUTED_TEXT)]
+        ] or [ft.Text("No completions yet.", size=13, color=MUTED)]
 
         history_rows: list[ft.Control] = []
         for assignment in container.assignments.history_for_task(task.id, limit=6):
@@ -397,7 +376,7 @@ class TasksView(View):
                 ft.Text(
                     f"{character.name}: {outcome}{extra}, streak {assignment.current_streak}",
                     size=13,
-                    color=MUTED_TEXT,
+                    color=MUTED,
                 )
             )
 
@@ -411,7 +390,7 @@ class TasksView(View):
                 for day in board_dates
             ],
             wrap=True,
-        ) if board_dates else ft.Text("No boards yet.", size=13, color=MUTED_TEXT)
+        ) if board_dates else ft.Text("No boards yet.", size=13, color=MUTED)
 
         next_date = container.schedule_service.next_scheduled_date(task, today)
         portrait_panel = ft.Container(
@@ -423,27 +402,25 @@ class TasksView(View):
             [
                 ft.Row(
                     [
-                        status_chip(task.status.value, STATUS_COLORS[task.status.value]),
-                        ft.Text(mask_label(task.weekday_mask), size=14, color=MUTED_TEXT),
+                        ft.Text(task.status.value.capitalize(), size=14, color=TEXT_DIM),
+                        ft.Text(mask_label(task.weekday_mask), size=14, color=MUTED),
                         ft.Text(
                             f"next: {next_date.strftime('%a %d %b')}" if next_date else "",
                             size=14,
-                            color=MUTED_TEXT,
+                            color=MUTED,
                         ),
                     ],
                     spacing=10,
                 ),
-                ft.Text(task.description or "", size=14, color=MUTED_TEXT),
+                ft.Text(task.description or "", size=14, color=MUTED),
                 ft.Text(
                     f"{task.weight.value.title()} weight",
                     size=14,
-                    color=MUTED_TEXT,
+                    color=MUTED,
                 ),
                 section_title("Character"),
                 character_info,
-                progress_dots(
-                    progress.used_stamp_numbers, progress.next_stamp_number, size=16
-                ),
+                progress_run(progress.used_stamp_numbers, progress.next_stamp_number),
                 section_title("Recent completions"),
                 *completion_rows,
                 section_title("Assignment history"),
@@ -463,25 +440,20 @@ class TasksView(View):
             height=620,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
-        dialog = ft.AlertDialog(
+        dialog = style_dialog(ft.AlertDialog(
             title=ft.Text(task.name, size=22, weight=ft.FontWeight.W_600),
             content=content,
-        )
+        ))
 
         def act(action: str) -> None:
             try:
                 if action == "pause":
-                    deducted = container.task_service.pause(task.id)
-                    if deducted:
-                        self.app.notify(
-                            f"Paused {task.name} and deducted {deducted} "
-                            f"point{'s' if deducted != 1 else ''}."
-                        )
+                    container.task_service.pause(task.id)
                 elif action == "resume":
                     container.task_service.resume(task.id)
                 elif action == "activate":
                     assignment = container.task_service.activate(task.id)
-                    self.page.close(dialog)
+                    self.app.close_dialog(dialog)
                     self._show_assignment_result(task.name, assignment.character_id)
                     self.refresh()
                     return
@@ -490,14 +462,15 @@ class TasksView(View):
             except TaskStampsError as error:
                 self.app.error(error)
                 return
-            self.page.close(dialog)
+            self.app.close_dialog(dialog)
+            self.app.refresh_chest_count()
             self.refresh()
 
         actions: list[ft.Control] = [
-            ft.TextButton("Close", on_click=lambda _: self.page.close(dialog)),
+            ft.TextButton("Close", on_click=lambda _: self.app.close_dialog(dialog)),
             ft.TextButton(
                 "Edit",
-                on_click=lambda _: (self.page.close(dialog), self.open_editor(task.id)),
+                on_click=lambda _: (self.app.close_dialog(dialog), self.open_editor(task.id)),
             ),
         ]
         if task.status == TaskStatus.ACTIVE:
@@ -511,8 +484,8 @@ class TasksView(View):
                 ft.TextButton(
                     "Archive",
                     on_click=lambda _: act("archive"),
-                    style=ft.ButtonStyle(color="#A65D57"),
+                    style=ft.ButtonStyle(color=BAD),
                 )
             )
         dialog.actions = actions
-        self.page.open(dialog)
+        self.app.open_dialog(dialog)

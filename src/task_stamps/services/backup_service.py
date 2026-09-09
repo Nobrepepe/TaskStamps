@@ -30,12 +30,14 @@ _EXPORT_TABLES = (
     "character_assignments",
     "task_completions",
     "stamp_placements",
+    "daily_bosses",
     "pause_periods",
     "assets",
     "asset_versions",
     "app_settings",
-    "vice_offerings",
-    "vice_claims",
+    "vice_rewards",
+    "vice_chests",
+    "task_misses",
 )
 
 
