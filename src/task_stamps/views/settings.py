@@ -235,6 +235,51 @@ class SettingsView(View):
             spacing=8,
         )
 
+        boss_sound_id = settings.boss_fallback_sound_version_id
+
+        def import_boss_sound(_) -> None:
+            def handle(path: str) -> None:
+                try:
+                    version = container.asset_service.import_file(path, AssetType.SOUND)
+                except TaskStampsError as error:
+                    self.app.error(error)
+                    return
+                settings.boss_fallback_sound_version_id = version.id
+                self.refresh()
+
+            self.app.pick_file(_SOUND_EXTS, handle)
+
+        def clear_boss_sound(_) -> None:
+            settings.boss_fallback_sound_version_id = None
+            self.refresh()
+
+        boss_sound_controls: list[ft.Control] = [
+            ft.Text("Global Boss sound:", size=13),
+            ft.Text("Set" if boss_sound_id else "Not set", size=12, color=MUTED),
+            ft.TextButton("Import…", on_click=import_boss_sound),
+        ]
+        if boss_sound_id:
+            boss_sound_controls.extend([
+                ft.TextButton(
+                    "Test",
+                    on_click=lambda _: self.app.play_sound_version(
+                        boss_sound_id, force=True
+                    ),
+                ),
+                ft.TextButton("Clear", on_click=clear_boss_sound),
+            ])
+        boss_sound_row = ft.Column(
+            [
+                ft.Row(boss_sound_controls, spacing=8),
+                ft.Text(
+                    "Plays when a Boss with no defeat sound of its own is beaten.",
+                    size=12,
+                    color=MUTED,
+                ),
+            ],
+            spacing=2,
+        )
+
         animation_switch = ft.Switch(
             label="Reduced animation",
             value=settings.reduced_animation,
@@ -347,6 +392,7 @@ class SettingsView(View):
                         sound_switch,
                         ft.Row([ft.Text("Master volume", size=13), volume_slider]),
                         fallback_row,
+                        boss_sound_row,
                     ],
                     spacing=8,
                 )

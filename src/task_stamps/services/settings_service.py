@@ -7,6 +7,7 @@ from task_stamps.data.repositories.settings import SettingsRepository
 KEY_SOUND_ENABLED = "sound_enabled"
 KEY_MASTER_VOLUME = "master_volume"
 KEY_FALLBACK_SOUND = "fallback_sound_version_id"
+KEY_BOSS_FALLBACK_SOUND = "boss_fallback_sound_version_id"
 KEY_REDUCED_ANIMATION = "reduced_animation"
 KEY_WEEK_START = "week_start"  # "monday" | "sunday"
 KEY_BOARD_BACKGROUND = "board_background"
@@ -48,6 +49,15 @@ class SettingsService:
     @fallback_sound_version_id.setter
     def fallback_sound_version_id(self, value: str | None) -> None:
         self.repo.set(KEY_FALLBACK_SOUND, value)
+
+    @property
+    def boss_fallback_sound_version_id(self) -> str | None:
+        """The Boss defeat sound used when the day's character has none."""
+        return self.repo.get(KEY_BOSS_FALLBACK_SOUND, None)
+
+    @boss_fallback_sound_version_id.setter
+    def boss_fallback_sound_version_id(self, value: str | None) -> None:
+        self.repo.set(KEY_BOSS_FALLBACK_SOUND, value)
 
     # -- interface ----------------------------------------------------
     @property

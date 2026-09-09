@@ -15,6 +15,7 @@ from task_stamps.domain.enums import TaskStatus
 from task_stamps.domain.models import Character, DailyBoss
 from task_stamps.services.board_service import BoardService
 from task_stamps.services.schedule_service import ScheduleService
+from task_stamps.services.settings_service import SettingsService
 from task_stamps.utilities.clock import Clock
 
 
@@ -31,6 +32,7 @@ class BossService:
         completions: CompletionRepository,
         schedule: ScheduleService,
         board: BoardService,
+        settings: SettingsService,
     ) -> None:
         self.db = db
         self.clock = clock
@@ -42,6 +44,7 @@ class BossService:
         self.completions = completions
         self.schedule = schedule
         self.board = board
+        self.settings = settings
 
     def daily_boss(self, day: date | None = None) -> DailyBoss | None:
         day = day or self.clock.today()
@@ -88,7 +91,13 @@ class BossService:
         character = self.characters.get(record.character_id)
         world = self.worlds.get(character.world_id)
         image = self.assets.get_version(record.image_asset_version_id)
+        # The character's own defeat sound is frozen into the daily record; the
+        # global Boss sound is a live setting standing in when it has none.
         sound = self.assets.find_version(record.sound_asset_version_id)
+        if sound is None:
+            sound = self.assets.find_version(
+                self.settings.boss_fallback_sound_version_id
+            )
         landed, target = self.progress(day)
         return DailyBoss(
             date=day,

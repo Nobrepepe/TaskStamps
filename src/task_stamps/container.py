@@ -91,6 +91,7 @@ class AppContainer:
             self.completions,
             self.schedule_service,
             self.board_service,
+            self.settings_service,
         )
         self.chest_service = ChestService(self.db, clock, rng, self.chests)
         self.completion_service = CompletionService(

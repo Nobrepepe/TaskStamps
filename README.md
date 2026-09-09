@@ -17,7 +17,8 @@ Everything runs offline. No accounts, no cloud, no telemetry.
   spots. Layouts are saved once and reproduce identically forever.
 - **Daily Boss rotation** — characters with dedicated Boss artwork rotate
   in creation order each calendar day. Scheduled completions strike the Boss;
-  defeating it can play that character's optional Boss sound.
+  defeating it plays that character's own Boss sound, or the global Boss
+  sound when it has none.
 - **Recurring weekday tasks** — each task runs on specific weekdays
   (Monday–Sunday); a streak means consecutive *scheduled* completions.
 - **Character assignments** — one character per active task, drawn randomly
@@ -38,8 +39,10 @@ Everything runs offline. No accounts, no cloud, no telemetry.
   version; history keeps rendering the old bytes. Unreferenced files are only
   removed through an explicit maintenance action.
 - **Sounds** — the global stamp sound plays on every completion, followed by
-  the per-stamp sound or character default when assigned, with a mute switch
-  and master volume.
+  the per-stamp sound or character default when assigned. A global Boss sound
+  stands in whenever the day's Boss has no defeat sound of its own. Both are
+  live settings rather than frozen into history, with a mute switch and master
+  volume.
 - **Vice Chests** — write your own rewards into nine slots: Minor, Medium and
   Major tasks crossed with streaks 5, 10 and 15. Reaching a milestone drops a
   chest onto one random reward from that slot, waiting in the inventory until

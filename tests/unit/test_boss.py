@@ -10,7 +10,7 @@ from task_stamps.data.migrations.m0003_task_penalties import SQL as M3
 from task_stamps.data.migrations.m0004_worldhub import SQL as M4
 from task_stamps.data.migrations.m0005_dark_board import SQL as M5
 from task_stamps.data.migrations.m0006_daily_boss import SQL as M6
-from task_stamps.domain.enums import PoolType
+from task_stamps.domain.enums import AssetType, PoolType
 from task_stamps.utilities.placeholder_art import render_beep_wav, render_portrait_png
 from task_stamps.views.today import TodayView
 from tests.helpers import EVERY_DAY, make_character, make_task, make_world
@@ -183,3 +183,53 @@ def test_vice_chest_schema_migrates_from_v6_and_keeps_miss_history(tmp_path):
         ("t1", "2026-01-06")
     ]
     database.close()
+
+
+def _import_global_boss_sound(container, source_files, name="global_boss.wav"):
+    audio = source_files / name
+    render_beep_wav(audio, duration=0.02)
+    version = container.asset_service.import_file(audio, AssetType.SOUND)
+    container.settings_service.boss_fallback_sound_version_id = version.id
+    return version
+
+
+def test_global_boss_sound_stands_in_when_the_character_has_none(
+    container, source_files
+):
+    world = make_world(container)
+    character = make_character(container, world.id, "Boss", source_files)
+    _boss_media(container, character.id, source_files)  # image only, no sound
+    assert container.boss_service.daily_boss().sound_relative_path is None
+
+    version = _import_global_boss_sound(container, source_files)
+
+    boss = container.boss_service.daily_boss()
+    assert boss.sound_relative_path == container.asset_service.relative_path(version.id)
+
+
+def test_a_characters_own_defeat_sound_wins_over_the_global_one(
+    container, source_files
+):
+    world = make_world(container)
+    character = make_character(container, world.id, "Boss", source_files)
+    _boss_media(container, character.id, source_files, sound=True)
+    _import_global_boss_sound(container, source_files)
+
+    boss = container.boss_service.daily_boss()
+    own = container.characters.get(character.id).boss_sound_asset_version_id
+    assert boss.sound_relative_path == container.asset_service.relative_path(own)
+
+
+def test_clearing_the_global_boss_sound_returns_the_boss_to_silence(
+    container, source_files
+):
+    world = make_world(container)
+    character = make_character(container, world.id, "Boss", source_files)
+    _boss_media(container, character.id, source_files)
+    _import_global_boss_sound(container, source_files)
+    assert container.boss_service.daily_boss().sound_relative_path is not None
+
+    # A live playback setting, not frozen into the day's record.
+    container.settings_service.boss_fallback_sound_version_id = None
+
+    assert container.boss_service.daily_boss().sound_relative_path is None
