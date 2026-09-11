@@ -15,10 +15,10 @@ Everything runs offline. No accounts, no cloud, no telemetry.
 - **Daily stamp board** — a large 16:9 board per calendar day; stamps land
   with a random position, slight rotation and scale, preferring uncrowded
   spots. Layouts are saved once and reproduce identically forever.
-- **Daily Boss rotation** — characters with dedicated Boss artwork rotate
-  in creation order each calendar day. Scheduled completions strike the Boss;
-  defeating it plays that character's own Boss sound, or the global Boss
-  sound when it has none.
+- **Daily Boss** — each calendar day draws a random character with dedicated
+  Boss artwork, never the same one two days running when another is
+  available. Scheduled completions strike the Boss; defeating it plays that
+  character's own Boss sound, or the global Boss sound when it has none.
 - **Recurring weekday tasks** — each task runs on specific weekdays
   (Monday–Sunday); a streak means consecutive *scheduled* completions.
 - **Character assignments** — one character per active task, drawn randomly

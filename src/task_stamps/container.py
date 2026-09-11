@@ -83,6 +83,7 @@ class AppContainer:
         self.boss_service = BossService(
             self.db,
             clock,
+            rng,
             self.bosses,
             self.characters,
             self.worlds,

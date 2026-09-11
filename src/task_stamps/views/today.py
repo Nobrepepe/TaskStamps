@@ -128,13 +128,17 @@ class TodayView(View):
         )
         ratio = min(1.0, boss.strikes_landed / boss.strikes_target) if boss.strikes_target else 0.0
         progress_width = width * ratio
+        # The 7px dot is centred on the 3px meter, so it overhangs by 2px each
+        # side. The banner clips its edges, so the meter is lifted clear of the
+        # bottom rather than letting the dot's lower half be cut off.
+        meter_bottom = 2
         dot = ft.Container(
             width=7,
             height=7,
             bgcolor=ACCENT_2,
             border_radius=4,
-            left=max(0, progress_width - 3.5),
-            top=-2,
+            left=min(max(0, progress_width - 3.5), width - 7),
+            bottom=meter_bottom - 2,
             opacity=1.0 if self.app.container.settings_service.reduced_animation else 0.55,
         )
         if not self.app.container.settings_service.reduced_animation:
@@ -247,10 +251,10 @@ class TodayView(View):
                 ),
                 left,
                 right,
-                ft.Container(left=0, bottom=0, width=width, height=3, bgcolor="#1Ff4ece1"),
+                ft.Container(left=0, bottom=meter_bottom, width=width, height=3, bgcolor="#1Ff4ece1"),
                 ft.Container(
                     left=0,
-                    bottom=0,
+                    bottom=meter_bottom,
                     width=progress_width,
                     height=3,
                     gradient=ft.LinearGradient(colors=["#66b48ade", ACCENT_2]),
