@@ -377,14 +377,12 @@ class TodayView(View):
             return
         if hasattr(self, "_add_dialog"):
             self.app.close_dialog(self._add_dialog)
-        # The Boss chest is minted once per defeat, so its arrival *is* the
-        # "newly defeated" signal the sound waits on.
         boss = self.app.container.boss_service.daily_boss()
         self.refresh(animate_last=True)
         self.app.refresh_chest_count()
         self.app.play_completion_sounds(
             result.sound_version_id,
-            boss.sound_relative_path if result.boss_chest_granted and boss else None,
+            boss.sound_relative_path if result.boss_defeated and boss else None,
         )
         self._show_undo_snack(result)
         self._announce_rollover(result)
@@ -396,7 +394,8 @@ class TodayView(View):
                 content=ft.Text(
                     f"{completion.task_name_snapshot}: stamp {completion.streak_number} placed"
                     + (f" · chest earned: {result.chest.reward_name_snapshot}" if result.chest else "")
-                    + (" · Boss chest sealed!" if result.boss_chest_granted else ""),
+                    + (f" · Boss down — chest earned: {result.boss_chest.reward_name_snapshot}"
+                       if result.boss_chest else " · Boss down!" if result.boss_defeated else ""),
                     color=TEXT,
                 ),
                 bgcolor=BG_2,

@@ -66,7 +66,8 @@ class CompletionResult:
     new_assignment: CharacterAssignment | None
     task_deactivated: bool  # no replacement character existed
     chest: ViceChest | None  # streak 5/10/15 earned a chest
-    boss_chest_granted: bool  # this completion defeated today's Boss
+    boss_defeated: bool  # this completion brought today's Boss down
+    boss_chest: ViceChest | None  # the reward rolled for that defeat
 
 
 class CompletionService:
@@ -150,6 +151,10 @@ class CompletionService:
             if assignment is None:
                 raise NoActiveAssignmentError()
 
+            # Was the Boss already down before this stamp? The sound greets the
+            # fall itself, which happens whether or not a reward exists to roll.
+            boss_before = self.boss.daily_boss(today)
+
             new_streak = assignment.current_streak + 1
             stamp = self.characters.stamp_by_sequence(
                 assignment.character_id, new_streak
@@ -186,10 +191,15 @@ class CompletionService:
                 task.weight, new_streak, completion.id
             )
             # The Boss is defeated when today's board holds every stamp the day
-            # asks for; the grant is idempotent, so the insert *is* the event.
-            boss = self.boss.daily_boss(today)
+            # asks for. The chest grant is idempotent per day, so a later
+            # completion cannot mint a second one.
+            boss_after = self.boss.daily_boss(today)
+            boss_is_down = boss_after is not None and boss_after.defeated
+            boss_defeated = boss_is_down and not (
+                boss_before is not None and boss_before.defeated
+            )
             boss_chest = self.chest_service.grant_boss_chest_if_defeated(
-                today, boss is not None and boss.defeated
+                today, boss_is_down
             )
 
             assignment_completed = new_streak >= STAMPS_PER_CHARACTER
@@ -229,7 +239,8 @@ class CompletionService:
                 new_assignment=new_assignment,
                 task_deactivated=task_deactivated,
                 chest=chest,
-                boss_chest_granted=boss_chest is not None,
+                boss_defeated=boss_defeated,
+                boss_chest=boss_chest,
             )
 
     # -- undo --------------------------------------------------------------

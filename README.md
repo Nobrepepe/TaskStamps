@@ -47,9 +47,9 @@ Everything runs offline. No accounts, no cloud, no telemetry.
   Major tasks crossed with streaks 5, 10 and 15. Reaching a milestone drops a
   chest onto one random reward from that slot, waiting in the inventory until
   you claim it. Trivial tasks award stamps only.
-- **Boss chests** — defeating the daily Boss seals a chest holding all nine
-  slots at once. Opening it rolls one reward, weighted by difficulty, so a
-  Major reward at streak 15 is the rarest thing in it.
+- **Boss chests** — defeating the daily Boss rolls one reward across all nine
+  slots, weighted by difficulty, and drops a chest on it straight away. A
+  Major reward at streak 15 is the rarest roll there is.
 - **Backup / restore / export** — single-archive backups (database + assets
   + settings + schema metadata), validated restore with an automatic safety
   backup, and human-readable JSON export.

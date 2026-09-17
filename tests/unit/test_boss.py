@@ -107,9 +107,8 @@ def test_boss_progress_and_defeat_transition(container, clock, source_files):
     result = container.completion_service.complete_task(task.id)
     after = container.boss_service.daily_boss()
     assert (after.strikes_landed, after.strikes_target, after.defeated) == (1, 1, True)
-    # The Boss chest is minted exactly once, so its arrival is the defeat event.
-    assert result.boss_chest_granted
-    assert container.chests.boss_chest_for(clock.today()) is not None
+    # The completion reports the fall itself, independently of any reward.
+    assert result.boss_defeated
 
 
 def test_boss_image_accepts_any_dimensions(container, source_files):

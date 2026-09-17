@@ -137,9 +137,6 @@ class ChestService:
     def unclaimed_total(self) -> int:
         return self.chests.unclaimed_total()
 
-    def sealed_boss_count(self) -> int:
-        return self.chests.sealed_boss_count()
-
     # -- grants (called inside the caller's transaction) -------------------
 
     def grant_for_completion(
@@ -168,14 +165,35 @@ class ChestService:
     def grant_boss_chest_if_defeated(
         self, day: date, defeated: bool
     ) -> ViceChest | None:
-        """Grant the day's sealed Boss chest. Idempotent: the second call for
-        a day returns None, so the insert itself is the 'newly defeated' event."""
-        if not defeated:
+        """Roll the day's Boss reward and drop a chest on it.
+
+        The draw happens the moment the Boss falls — a slot by difficulty, then
+        a reward inside it — so the chest joins the others and is claimed
+        whenever you like. Idempotent: a second call for the same day returns
+        None. Nothing is granted when no rewards exist at all, the same rule an
+        empty streak slot follows.
+        """
+        if not defeated or self.chests.boss_chest_for(day) is not None:
             return None
-        chest = self.chests.grant_boss_chest(day)
-        if chest is not None:
-            logger.info("Boss defeated on %s; sealed chest granted", day)
+        reward = self._roll_any_reward()
+        if reward is None:
+            return None
+        chest = self.chests.grant_boss_chest(reward, day)
+        logger.info("Boss defeated on %s; chest granted for %s", day, reward.name)
         return chest
+
+    def _roll_any_reward(self) -> ViceReward | None:
+        """Draw one reward across all nine slots, weighted by difficulty."""
+        filled = [
+            (weight, tier)
+            for weight in CHEST_WEIGHTS
+            for tier in CHEST_TIERS
+            if self.chests.rewards_in_slot(weight, tier)
+        ]
+        if not filled:
+            return None
+        weight, tier = weighted_pick(filled, self.rng)
+        return self.rng.choice(self.chests.rewards_in_slot(weight, tier))
 
     # -- revocations (undo) ------------------------------------------------
 
@@ -193,40 +211,16 @@ class ChestService:
         self.chests.delete_chest(chest.id)
         return chest.reward_name_snapshot
 
-    def revoke_boss_chest(self, day: date) -> bool:
-        """Take back the day's Boss chest once the Boss is no longer defeated."""
+    def revoke_boss_chest(self, day: date) -> str | None:
+        """Take back the day's Boss chest once the Boss is no longer defeated.
+        Returns the reward name if one was revoked."""
         chest = self.chests.boss_chest_for(day)
         if chest is None:
-            return False
-        if not chest.is_sealed:
+            return None
+        if chest.is_claimed:
             raise ValidationError(
-                "Today's Boss chest has already been opened, so this completion "
-                "cannot be undone."
+                f"The Boss chest for today ({chest.reward_name_snapshot}) has "
+                "already been claimed, so this completion cannot be undone."
             )
         self.chests.delete_chest(chest.id)
-        return True
-
-    # -- opening a Boss chest ---------------------------------------------
-
-    def open_boss_chest(self) -> ViceChest:
-        """Unseal one Boss chest: roll a slot by difficulty, then a reward
-        inside it, and claim that reward on the spot."""
-        with self.db.transaction():
-            chest = self.chests.oldest_sealed_boss_chest()
-            if chest is None:
-                raise ValidationError("You have no Boss chests to open.")
-            filled = [
-                (weight, tier)
-                for weight in CHEST_WEIGHTS
-                for tier in CHEST_TIERS
-                if self.chests.rewards_in_slot(weight, tier)
-            ]
-            if not filled:
-                raise ValidationError(
-                    "Add at least one reward before opening a Boss chest."
-                )
-            weight, tier = weighted_pick(filled, self.rng)
-            reward = self.rng.choice(self.chests.rewards_in_slot(weight, tier))
-            opened = self.chests.open_boss_chest(chest.id, reward)
-            logger.info("Boss chest opened: %s", reward.name)
-            return opened
+        return chest.reward_name_snapshot
