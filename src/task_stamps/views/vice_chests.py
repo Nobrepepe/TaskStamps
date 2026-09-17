@@ -1,4 +1,4 @@
-"""Define the nine reward slots, claim earned chests, open Boss chests."""
+"""Define the nine reward slots and claim the chests they earn."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import flet as ft
 
 from task_stamps.components.common import confirm_dialog
 from task_stamps.components.theme import (
-    ACCENT, ACCENT_2, BAD, BG_HOVER_ALPHA, MUTED, MUTED_2, SERIF, TEXT, TEXT_DIM,
+    ACCENT, BAD, BG_HOVER_ALPHA, MUTED, MUTED_2, SERIF, TEXT, TEXT_DIM,
     eyebrow, eyebrow_row, hairline, style_dialog, text_action,
 )
 from task_stamps.domain.enums import CHEST_TIERS, CHEST_WEIGHTS, TaskWeight
@@ -25,7 +25,6 @@ _WEIGHT_BLURB = {
 class ViceChestsView(View):
     def build(self) -> ft.Control:
         self.summary = ft.Text()
-        self.boss_host = ft.Column(spacing=0)
         self.rows = ft.Column(spacing=0)
         header = ft.Column([
             eyebrow("Rewards"),
@@ -34,11 +33,11 @@ class ViceChestsView(View):
         ], spacing=10)
         return ft.Container(
             width=900,
-            content=ft.Column([header, self.boss_host, self.rows,
+            content=ft.Column([header, self.rows,
                 ft.Text("Reaching streak 5, 10 or 15 on a Minor, Medium or Major task drops one "
                         "chest onto a random reward from that slot. Trivial tasks earn stamps only. "
-                        "Defeating the daily Boss seals a chest that holds all nine slots at once — "
-                        "the harder the reward, the rarer it rolls.",
+                        "Defeating the daily Boss rolls one reward across all nine slots and "
+                        "drops a chest on that — the harder the reward, the rarer it rolls.",
                         size=13, color=MUTED_2, width=580)], spacing=32, scroll=ft.ScrollMode.AUTO),
             padding=ft.padding.only(left=56, right=56, top=40, bottom=72), expand=True,
         )
@@ -47,7 +46,6 @@ class ViceChestsView(View):
         service = self.app.container.chest_service
         slots = service.slots()
         waiting = service.unclaimed_total()
-        sealed = service.sealed_boss_count()
         defined = sum(len(slot.rewards) for slot in slots)
         self.summary.spans = [
             ft.TextSpan(str(waiting), ft.TextStyle(font_family=SERIF, size=26, color=ACCENT)),
@@ -55,7 +53,6 @@ class ViceChestsView(View):
                         f"reward{'' if defined == 1 else 's'}.",
                         ft.TextStyle(size=15, color=TEXT_DIM)),
         ]
-        self.boss_host.controls = self._boss_section(sealed)
         controls: list[ft.Control] = []
         for weight in CHEST_WEIGHTS:
             controls.append(ft.Container(height=10))
@@ -69,50 +66,6 @@ class ViceChestsView(View):
                 controls.extend(self._slot_block(slot))
         self.rows.controls = controls
         self.page.update()
-
-    # -- the Boss chest ----------------------------------------------------
-
-    def _boss_section(self, sealed: int) -> list[ft.Control]:
-        action = (
-            text_action("Open a chest →", lambda _: self._open_boss_chest(), color=ACCENT_2)
-            if sealed else None
-        )
-        caption = (
-            f"{sealed} sealed. Opening one rolls a single reward — weighted by difficulty, "
-            "so Major rewards at streak 15 are the rarest thing in it."
-            if sealed else
-            "Complete every task the day asks for to defeat the daily Boss and seal one."
-        )
-        return [
-            eyebrow_row("Boss chest", action),
-            ft.Container(
-                padding=ft.padding.only(top=12, bottom=4),
-                content=ft.Row([
-                    ft.Text(str(sealed), size=34, font_family=SERIF,
-                            color=ACCENT_2 if sealed else MUTED_2),
-                    ft.Text(caption, size=13, color=TEXT_DIM if sealed else MUTED,
-                            width=620),
-                ], spacing=18, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-            ),
-        ]
-
-    def _open_boss_chest(self) -> None:
-        try:
-            chest = self.app.container.chest_service.open_boss_chest()
-        except TaskStampsError as error:
-            self.app.error(error); return
-        dialog = style_dialog(ft.AlertDialog(
-            modal=True, title=ft.Text("The Boss chest opens"),
-            content=ft.Column([
-                ft.Text(chest.reward_name_snapshot or "", size=32, color=ACCENT_2,
-                        font_family=SERIF),
-                ft.Text("Yours. The chest is spent.", size=13.5, color=TEXT_DIM),
-            ], width=420, tight=True, spacing=8),
-        ))
-        dialog.actions = [ft.TextButton("Take it", on_click=lambda _: self.app.close_dialog(dialog))]
-        self.app.open_dialog(dialog)
-        self.app.refresh_chest_count()
-        self.refresh()
 
     # -- the nine slots ----------------------------------------------------
 

@@ -1,4 +1,4 @@
-"""Persistent daily Boss rotation and progress read model."""
+"""Persistent daily Boss draw and progress read model."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from task_stamps.services.board_service import BoardService
 from task_stamps.services.schedule_service import ScheduleService
 from task_stamps.services.settings_service import SettingsService
 from task_stamps.utilities.clock import Clock
+from task_stamps.utilities.rng import RandomProvider
 
 
 class BossService:
@@ -24,6 +25,7 @@ class BossService:
         self,
         db: Database,
         clock: Clock,
+        rng: RandomProvider,
         bosses: BossRepository,
         characters: CharacterRepository,
         worlds: WorldRepository,
@@ -36,6 +38,7 @@ class BossService:
     ) -> None:
         self.db = db
         self.clock = clock
+        self.rng = rng
         self.bosses = bosses
         self.characters = characters
         self.worlds = worlds
@@ -58,12 +61,16 @@ class BossService:
         pool = self.characters.boss_pool()
         if not pool:
             return None
+        # A fresh random draw each day, stored so the day's Boss never changes
+        # once seen. The last Boss sits out whenever anyone else can stand in,
+        # so the same face never greets you two days running.
         previous = self.bosses.latest_before(day)
-        if previous is None:
-            selected = pool[0]
-        else:
-            elapsed = (day - previous.boss_date).days
-            selected = self._advance(pool, previous.character_id, elapsed)
+        candidates = [
+            character
+            for character in pool
+            if previous is None or character.id != previous.character_id
+        ] or pool
+        selected = self.rng.choice(candidates)
         assert selected.boss_image_asset_version_id is not None
         return self.bosses.create(
             day,
@@ -71,21 +78,6 @@ class BossService:
             selected.boss_image_asset_version_id,
             selected.boss_sound_asset_version_id,
         )
-
-    def _advance(
-        self, pool: list[Character], previous_character_id: str, elapsed: int
-    ) -> Character:
-        for index, character in enumerate(pool):
-            if character.id == previous_character_id:
-                return pool[(index + elapsed) % len(pool)]
-        previous = self.characters.get(previous_character_id)
-        previous_key = (previous.created_at, previous.id)
-        first_after = next(
-            (index for index, character in enumerate(pool)
-             if (character.created_at, character.id) > previous_key),
-            0,
-        )
-        return pool[(first_after + max(0, elapsed - 1)) % len(pool)]
 
     def _read_model(self, record: DailyBossRecord, day: date) -> DailyBoss:
         character = self.characters.get(record.character_id)

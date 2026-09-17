@@ -202,59 +202,7 @@ def test_undo_is_refused_once_the_chest_is_claimed(container, clock, source_file
 # -- the Boss chest ------------------------------------------------------
 
 
-def test_defeating_the_boss_seals_exactly_one_chest_per_day(
-    container, clock, source_files
-):
-    world = make_world(container)
-    character = make_character(container, world.id, "Boss", source_files)
-    _boss_media(container, character.id, source_files)
-    make_character(container, world.id, "Spare", source_files)
-    first = make_task(container, "First", EVERY_DAY)
-    second = make_task(container, "Second", EVERY_DAY)
-
-    opening = container.completion_service.complete_task(first.id)
-    assert not opening.boss_chest_granted  # one of two tasks done
-
-    closing = container.completion_service.complete_task(second.id)
-    assert closing.boss_chest_granted
-    assert container.chest_service.sealed_boss_count() == 1
-
-    # A second evaluation of the same day mints nothing further.
-    assert (
-        container.chest_service.grant_boss_chest_if_defeated(clock.today(), True) is None
-    )
-    assert container.chest_service.sealed_boss_count() == 1
-
-
-def test_undo_returns_the_sealed_boss_chest(container, clock, source_files):
-    world = make_world(container)
-    character = make_character(container, world.id, "Boss", source_files)
-    _boss_media(container, character.id, source_files)
-    make_character(container, world.id, "Spare", source_files)
-    task = make_task(container, weekdays=EVERY_DAY)
-    result = container.completion_service.complete_task(task.id)
-    assert container.chest_service.sealed_boss_count() == 1
-
-    container.completion_service.undo_completion(result.completion.id)
-
-    assert container.chest_service.sealed_boss_count() == 0
-
-
-def test_undo_is_refused_once_the_boss_chest_is_opened(container, clock, source_files):
-    world = make_world(container)
-    character = make_character(container, world.id, "Boss", source_files)
-    _boss_media(container, character.id, source_files)
-    make_character(container, world.id, "Spare", source_files)
-    _reward(container, TaskWeight.MINOR, 5, "Coffee")
-    task = make_task(container, weekdays=EVERY_DAY)
-    result = container.completion_service.complete_task(task.id)
-    container.chest_service.open_boss_chest()
-
-    with pytest.raises(UndoNotAllowedError, match="already been opened"):
-        container.completion_service.undo_completion(result.completion.id)
-
-
-def test_opening_a_boss_chest_rolls_a_reward_and_claims_it(
+def test_defeating_the_boss_rolls_one_reward_and_grants_its_chest(
     container, clock, source_files
 ):
     world = make_world(container)
@@ -262,20 +210,47 @@ def test_opening_a_boss_chest_rolls_a_reward_and_claims_it(
     _boss_media(container, character.id, source_files)
     make_character(container, world.id, "Spare", source_files)
     rewards = _fill_every_slot(container)
+    first = make_task(container, "First", EVERY_DAY)
+    second = make_task(container, "Second", EVERY_DAY)
+
+    opening = container.completion_service.complete_task(first.id)
+    assert (opening.boss_defeated, opening.boss_chest) == (False, None)
+
+    closing = container.completion_service.complete_task(second.id)
+    assert closing.boss_defeated
+    chest = closing.boss_chest
+    assert chest is not None
+    # Rolled at defeat, not at open: it names its reward and waits to be claimed.
+    assert chest.reward_id in {reward.id for reward in rewards.values()}
+    assert chest.reward_name_snapshot
+    assert not chest.is_claimed
+    assert _unclaimed(container, chest.reward_id) == 1
+
+    # A second evaluation of the same day mints nothing further.
+    assert (
+        container.chest_service.grant_boss_chest_if_defeated(clock.today(), True) is None
+    )
+    assert container.chest_service.unclaimed_total() == 1
+
+
+def test_a_boss_chest_is_claimed_like_any_other(container, clock, source_files):
+    world = make_world(container)
+    character = make_character(container, world.id, "Boss", source_files)
+    _boss_media(container, character.id, source_files)
+    make_character(container, world.id, "Spare", source_files)
+    _fill_every_slot(container)
     task = make_task(container, weekdays=EVERY_DAY)
-    container.completion_service.complete_task(task.id)
+    rolled = container.completion_service.complete_task(task.id).boss_chest
+    assert rolled is not None
 
-    opened = container.chest_service.open_boss_chest()
+    claimed = container.chest_service.claim(rolled.reward_id)
 
-    assert opened.reward_id in {reward.id for reward in rewards.values()}
-    assert opened.is_claimed
-    assert not opened.is_sealed
-    assert container.chest_service.sealed_boss_count() == 0
-    with pytest.raises(ValidationError, match="no Boss chests"):
-        container.chest_service.open_boss_chest()
+    assert claimed.id == rolled.id
+    assert claimed.is_claimed
+    assert container.chest_service.unclaimed_total() == 0
 
 
-def test_a_boss_chest_cannot_be_opened_with_no_rewards_defined(
+def test_the_boss_still_falls_when_no_rewards_are_defined(
     container, clock, source_files
 ):
     world = make_world(container)
@@ -283,13 +258,46 @@ def test_a_boss_chest_cannot_be_opened_with_no_rewards_defined(
     _boss_media(container, character.id, source_files)
     make_character(container, world.id, "Spare", source_files)
     task = make_task(container, weekdays=EVERY_DAY)
-    container.completion_service.complete_task(task.id)
 
-    with pytest.raises(ValidationError, match="at least one reward"):
-        container.chest_service.open_boss_chest()
+    result = container.completion_service.complete_task(task.id)
 
-    # Refusing to open leaves the chest sealed and waiting.
-    assert container.chest_service.sealed_boss_count() == 1
+    # Nothing to roll, so no chest — but the defeat itself still registers, and
+    # that is what the Boss sound listens for.
+    assert result.boss_defeated
+    assert result.boss_chest is None
+    assert container.chest_service.unclaimed_total() == 0
+
+
+def test_undo_takes_back_an_unclaimed_boss_chest(container, clock, source_files):
+    world = make_world(container)
+    character = make_character(container, world.id, "Boss", source_files)
+    _boss_media(container, character.id, source_files)
+    make_character(container, world.id, "Spare", source_files)
+    _fill_every_slot(container)
+    task = make_task(container, weekdays=EVERY_DAY)
+    result = container.completion_service.complete_task(task.id)
+    assert container.chest_service.unclaimed_total() == 1
+
+    container.completion_service.undo_completion(result.completion.id)
+
+    assert container.chest_service.unclaimed_total() == 0
+    assert container.chests.boss_chest_for(clock.today()) is None
+
+
+def test_undo_is_refused_once_the_boss_chest_is_claimed(container, clock, source_files):
+    world = make_world(container)
+    character = make_character(container, world.id, "Boss", source_files)
+    _boss_media(container, character.id, source_files)
+    make_character(container, world.id, "Spare", source_files)
+    _fill_every_slot(container)
+    task = make_task(container, weekdays=EVERY_DAY)
+    result = container.completion_service.complete_task(task.id)
+    container.chest_service.claim(result.boss_chest.reward_id)
+
+    with pytest.raises(UndoNotAllowedError, match="already been claimed"):
+        container.completion_service.undo_completion(result.completion.id)
+
+    assert not container.completions.get(result.completion.id).is_reversed
 
 
 # -- Boss chest odds -----------------------------------------------------

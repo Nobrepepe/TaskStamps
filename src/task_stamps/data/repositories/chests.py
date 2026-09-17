@@ -125,17 +125,14 @@ class ChestRepository(BaseRepository):
         )
         return self.get_chest(chest_id)
 
-    def grant_boss_chest(self, day: date) -> ViceChest | None:
-        """Insert the day's sealed Boss chest, or return None if it already
-        exists. The partial unique index on boss_date makes this the single
-        source of truth for 'the Boss was newly defeated'."""
-        if self.boss_chest_for(day) is not None:
-            return None
+    def grant_boss_chest(self, reward: ViceReward, day: date) -> ViceChest:
+        """Insert the day's Boss chest against the reward that was rolled. The
+        partial unique index on boss_date holds it to one per day."""
         chest_id = new_id()
         self.db.execute(
-            "INSERT INTO vice_chests(id, source, boss_date, granted_at) "
-            "VALUES (?, 'boss', ?, ?)",
-            (chest_id, day.isoformat(), self.now_iso()),
+            "INSERT INTO vice_chests(id, source, reward_id, reward_name_snapshot, "
+            "boss_date, granted_at) VALUES (?, 'boss', ?, ?, ?, ?)",
+            (chest_id, reward.id, reward.name, day.isoformat(), self.now_iso()),
         )
         return self.get_chest(chest_id)
 
@@ -151,13 +148,6 @@ class ChestRepository(BaseRepository):
         )
         return _row_to_chest(row) if row else None
 
-    def oldest_sealed_boss_chest(self) -> ViceChest | None:
-        row = self.db.query_one(
-            "SELECT * FROM vice_chests WHERE source = 'boss' AND reward_id IS NULL "
-            "ORDER BY granted_at, id LIMIT 1"
-        )
-        return _row_to_chest(row) if row else None
-
     def unclaimed_counts(self) -> dict[str, int]:
         return {
             row["reward_id"]: row["count"]
@@ -167,16 +157,13 @@ class ChestRepository(BaseRepository):
             )
         }
 
-    def sealed_boss_count(self) -> int:
+    def unclaimed_total(self) -> int:
+        # Every chest names a reward now. The reward_id test also skips any
+        # still-sealed Boss chest left in an older database, which nothing can
+        # claim and so must not pad the count.
         row = self.db.query_one(
             "SELECT COUNT(*) AS count FROM vice_chests "
-            "WHERE source = 'boss' AND reward_id IS NULL"
-        )
-        return int(row["count"]) if row else 0
-
-    def unclaimed_total(self) -> int:
-        row = self.db.query_one(
-            "SELECT COUNT(*) AS count FROM vice_chests WHERE claimed_at IS NULL"
+            "WHERE claimed_at IS NULL AND reward_id IS NOT NULL"
         )
         return int(row["count"]) if row else 0
 
@@ -193,15 +180,6 @@ class ChestRepository(BaseRepository):
             (self.now_iso(), row["id"]),
         )
         return self.get_chest(row["id"])
-
-    def open_boss_chest(self, chest_id: str, reward: ViceReward) -> ViceChest:
-        now = self.now_iso()
-        self.db.execute(
-            "UPDATE vice_chests SET reward_id = ?, reward_name_snapshot = ?, "
-            "claimed_at = ? WHERE id = ? AND reward_id IS NULL",
-            (reward.id, reward.name, now, chest_id),
-        )
-        return self.get_chest(chest_id)
 
     def delete_chest(self, chest_id: str) -> None:
         self.db.execute("DELETE FROM vice_chests WHERE id = ?", (chest_id,))

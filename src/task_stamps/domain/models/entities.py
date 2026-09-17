@@ -160,8 +160,8 @@ class ViceReward:
 
 @dataclass
 class ViceChest:
-    """An earned chest. Streak chests name their reward at grant time; a Boss
-    chest stays sealed (no reward) until it is opened."""
+    """An earned chest. Streak and Boss chests alike name their reward at grant
+    time and wait in the inventory until they are claimed."""
 
     id: str
     source: ChestSource
@@ -175,10 +175,6 @@ class ViceChest:
     @property
     def is_claimed(self) -> bool:
         return self.claimed_at is not None
-
-    @property
-    def is_sealed(self) -> bool:
-        return self.source is ChestSource.BOSS and self.reward_id is None
 
 
 @dataclass

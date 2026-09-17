@@ -128,13 +128,17 @@ class TodayView(View):
         )
         ratio = min(1.0, boss.strikes_landed / boss.strikes_target) if boss.strikes_target else 0.0
         progress_width = width * ratio
+        # The 7px dot is centred on the 3px meter, so it overhangs by 2px each
+        # side. The banner clips its edges, so the meter is lifted clear of the
+        # bottom rather than letting the dot's lower half be cut off.
+        meter_bottom = 2
         dot = ft.Container(
             width=7,
             height=7,
             bgcolor=ACCENT_2,
             border_radius=4,
-            left=max(0, progress_width - 3.5),
-            top=-2,
+            left=min(max(0, progress_width - 3.5), width - 7),
+            bottom=meter_bottom - 2,
             opacity=1.0 if self.app.container.settings_service.reduced_animation else 0.55,
         )
         if not self.app.container.settings_service.reduced_animation:
@@ -247,10 +251,10 @@ class TodayView(View):
                 ),
                 left,
                 right,
-                ft.Container(left=0, bottom=0, width=width, height=3, bgcolor="#1Ff4ece1"),
+                ft.Container(left=0, bottom=meter_bottom, width=width, height=3, bgcolor="#1Ff4ece1"),
                 ft.Container(
                     left=0,
-                    bottom=0,
+                    bottom=meter_bottom,
                     width=progress_width,
                     height=3,
                     gradient=ft.LinearGradient(colors=["#66b48ade", ACCENT_2]),
@@ -373,14 +377,12 @@ class TodayView(View):
             return
         if hasattr(self, "_add_dialog"):
             self.app.close_dialog(self._add_dialog)
-        # The Boss chest is minted once per defeat, so its arrival *is* the
-        # "newly defeated" signal the sound waits on.
         boss = self.app.container.boss_service.daily_boss()
         self.refresh(animate_last=True)
         self.app.refresh_chest_count()
         self.app.play_completion_sounds(
             result.sound_version_id,
-            boss.sound_relative_path if result.boss_chest_granted and boss else None,
+            boss.sound_relative_path if result.boss_defeated and boss else None,
         )
         self._show_undo_snack(result)
         self._announce_rollover(result)
@@ -392,7 +394,8 @@ class TodayView(View):
                 content=ft.Text(
                     f"{completion.task_name_snapshot}: stamp {completion.streak_number} placed"
                     + (f" · chest earned: {result.chest.reward_name_snapshot}" if result.chest else "")
-                    + (" · Boss chest sealed!" if result.boss_chest_granted else ""),
+                    + (f" · Boss down — chest earned: {result.boss_chest.reward_name_snapshot}"
+                       if result.boss_chest else " · Boss down!" if result.boss_defeated else ""),
                     color=TEXT,
                 ),
                 bgcolor=BG_2,

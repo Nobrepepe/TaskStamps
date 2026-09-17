@@ -15,10 +15,10 @@ Everything runs offline. No accounts, no cloud, no telemetry.
 - **Daily stamp board** — a large 16:9 board per calendar day; stamps land
   with a random position, slight rotation and scale, preferring uncrowded
   spots. Layouts are saved once and reproduce identically forever.
-- **Daily Boss rotation** — characters with dedicated Boss artwork rotate
-  in creation order each calendar day. Scheduled completions strike the Boss;
-  defeating it plays that character's own Boss sound, or the global Boss
-  sound when it has none.
+- **Daily Boss** — each calendar day draws a random character with dedicated
+  Boss artwork, never the same one two days running when another is
+  available. Scheduled completions strike the Boss; defeating it plays that
+  character's own Boss sound, or the global Boss sound when it has none.
 - **Recurring weekday tasks** — each task runs on specific weekdays
   (Monday–Sunday); a streak means consecutive *scheduled* completions.
 - **Character assignments** — one character per active task, drawn randomly
@@ -47,9 +47,9 @@ Everything runs offline. No accounts, no cloud, no telemetry.
   Major tasks crossed with streaks 5, 10 and 15. Reaching a milestone drops a
   chest onto one random reward from that slot, waiting in the inventory until
   you claim it. Trivial tasks award stamps only.
-- **Boss chests** — defeating the daily Boss seals a chest holding all nine
-  slots at once. Opening it rolls one reward, weighted by difficulty, so a
-  Major reward at streak 15 is the rarest thing in it.
+- **Boss chests** — defeating the daily Boss rolls one reward across all nine
+  slots, weighted by difficulty, and drops a chest on it straight away. A
+  Major reward at streak 15 is the rarest roll there is.
 - **Backup / restore / export** — single-archive backups (database + assets
   + settings + schema metadata), validated restore with an automatic safety
   backup, and human-readable JSON export.

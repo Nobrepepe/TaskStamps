@@ -26,21 +26,49 @@ def _boss_media(container, character_id, source_files, *, sound=False):
         container.library_service.import_boss_sound(character_id, audio)
 
 
-def test_daily_boss_is_stable_and_rotates_by_elapsed_days(container, clock, source_files):
+def test_daily_boss_is_stable_within_a_day_and_drawn_at_random(
+    container, clock, source_files
+):
     world = make_world(container)
     characters = [make_character(container, world.id, name, source_files) for name in ("A", "B", "C")]
     for character in characters:
         _boss_media(container, character.id, source_files)
-    ordered = container.characters.boss_pool()
+    pool = [character.id for character in container.characters.boss_pool()]
 
     first = container.boss_service.daily_boss()
-    assert first.character_id == ordered[0].id
-    assert container.boss_service.daily_boss() == first
+    assert container.boss_service.daily_boss() == first  # stored, never redrawn
+    assert first.day_number == clock.today().timetuple().tm_yday
 
-    clock.advance_days(2)
-    third_day = container.boss_service.daily_boss()
-    assert third_day.character_id == ordered[2].id
-    assert third_day.day_number == clock.today().timetuple().tm_yday
+    seen = [first.character_id]
+    for _ in range(30):
+        clock.advance_days(1)
+        seen.append(container.boss_service.daily_boss().character_id)
+
+    # Everyone turns up, never twice in a row, and not in creation order.
+    assert set(seen) == set(pool)
+    assert all(today != tomorrow for today, tomorrow in zip(seen, seen[1:]))
+    assert seen != [pool[index % len(pool)] for index in range(len(seen))]
+
+
+def test_the_last_boss_sits_out_even_after_days_away(container, clock, source_files):
+    world = make_world(container)
+    for name in ("A", "B"):
+        character = make_character(container, world.id, name, source_files)
+        _boss_media(container, character.id, source_files)
+    last_seen = container.boss_service.daily_boss().character_id
+
+    clock.advance_days(5)  # the app stayed closed; no Bosses were drawn meanwhile
+
+    assert container.boss_service.daily_boss().character_id != last_seen
+
+
+def test_a_sole_boss_is_drawn_every_day(container, clock, source_files):
+    world = make_world(container)
+    character = make_character(container, world.id, "Only", source_files)
+    _boss_media(container, character.id, source_files)
+    for _ in range(3):
+        assert container.boss_service.daily_boss().character_id == character.id
+        clock.advance_days(1)
 
 
 def test_daily_snapshot_keeps_old_art_after_replacement(container, source_files):
@@ -79,9 +107,8 @@ def test_boss_progress_and_defeat_transition(container, clock, source_files):
     result = container.completion_service.complete_task(task.id)
     after = container.boss_service.daily_boss()
     assert (after.strikes_landed, after.strikes_target, after.defeated) == (1, 1, True)
-    # The Boss chest is minted exactly once, so its arrival is the defeat event.
-    assert result.boss_chest_granted
-    assert container.chests.boss_chest_for(clock.today()) is not None
+    # The completion reports the fall itself, independently of any reward.
+    assert result.boss_defeated
 
 
 def test_boss_image_accepts_any_dimensions(container, source_files):
