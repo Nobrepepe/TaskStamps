@@ -50,6 +50,15 @@ Everything runs offline. No accounts, no cloud, no telemetry.
 - **Boss chests** — defeating the daily Boss rolls one reward across all nine
   slots, weighted by difficulty, and drops a chest on it straight away. A
   Major reward at streak 15 is the rarest roll there is.
+- **Goals** — numeric targets in either direction (pages up to 300, kilos
+  down to 80). Each goal's track is cut into ten 10% sections and carried by
+  one character whose ten ranked, square goal images follow the section you
+  are in. Log changes as you go — a negative entry moves you back, and
+  slipping past where the track started hands the goal to a new character and
+  restarts the track from there. Reaching the target drops a chest on the
+  reward you picked, then you extend the path (new character, new target) or
+  finish it. A weekly review reminder counts down from the last entry, and
+  today's latest entry can be undone.
 - **Backup / restore / export** — single-archive backups (database + assets
   + settings + schema metadata), validated restore with an automatic safety
   backup, and human-readable JSON export.
@@ -92,8 +101,9 @@ Everything runs offline. No accounts, no cloud, no telemetry.
 │   │   ├── backup_service.py       # backup/restore/export/factory reset
 │   │   ├── chest_service.py        # reward slots, chest grants and claims
 │   │   ├── boss_service.py         # daily Boss rotation and progress
+│   │   ├── goal_service.py         # goal tracks, legs, rebases, extensions
 │   │   ├── settings_service.py     # typed persisted settings
-│   ├── views/                  # Today, Tasks, Calendar, Worlds(+characters), Settings
+│   ├── views/                  # Today, Tasks, Goals, Calendar, Worlds(+characters), Settings
 │   ├── components/             # board renderer, cards, aspect-ratio images
 │   └── utilities/              # clock, rng, ids, dates, audio, placeholder art
 └── tests/
@@ -159,7 +169,8 @@ launcher, start it, then right-click its task manager entry and choose *Pin*.
 pytest
 ```
 
-The suite (105 tests) covers streak progression, chest grants at streaks 5,
+The suite (155 tests) covers goal tracks (sections in both directions,
+rebasing, reaching, extending, undo and the weekly review), streak progression, chest grants at streaks 5,
 10 and 15, Boss chest sealing/opening and its weighted odds, claiming and the
 undo rules that protect it, per-day completion rules, missed-day drops
 (including multi-day closures and the "today is never missed" rule) and the
@@ -178,7 +189,7 @@ random provider.
 | Windows | `%APPDATA%\task-stamps\app_data` |
 | macOS | `~/Library/Application Support/task-stamps/app_data` |
 
-Layout: `database/tasks_app.sqlite3`, `assets/{worlds,characters,stamps,sounds}/`,
+Layout: `database/tasks_app.sqlite3`, `assets/{worlds,characters,stamps,goals,sounds}/`,
 `backups/`, `logs/`.
 
 For development or a portable setup, point the app anywhere:
@@ -196,7 +207,8 @@ app supports lives at `worldhub/application-contract.json`.
 - **Install a ZIP** — Settings → World Hub content → *Install publication
   ZIP…*. The package is extracted to a staging area, fully validated (safe
   paths, manifest, embedded contract, every checksum, all references, then
-  Task Stamps' own rules: 15 stamps and a portrait per character), previewed,
+  Task Stamps' own rules: 15 stamps and a portrait per character, and goal
+  images all ten or none), previewed,
   and only then activated.
 - **Link a production folder** — point at the World Hub folder containing
   `current.json`, then use *Check for update* whenever you republish. The

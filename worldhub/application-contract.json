@@ -3,7 +3,7 @@
   "contractFormatVersion": 1,
   "appType": "task-stamps.stamp-set",
   "name": "Task Stamps — Stamp Set",
-  "description": "Worlds and characters for the Task Stamps habit tracker. Each character brings a portrait, optional Boss artwork and defeat sound, an optional signature sound, and exactly fifteen ordered stamp images earned by completing tasks. Characters should belong to the selected worlds.",
+  "description": "Worlds and characters for the Task Stamps habit tracker. Each character brings a portrait, optional Boss artwork and defeat sound, an optional signature sound, exactly fifteen ordered stamp images earned by completing tasks, and optionally ten ranked square goal images shown along a goal's track. Characters should belong to the selected worlds.",
   "supportedProtocolVersions": [
     1,
     2
@@ -116,6 +116,23 @@
           "hint": "The fifteen stamp images in earning order: slot 1 is the first stamp a task completion can award."
         },
         {
+          "id": "goal_images",
+          "label": "Goal images — ten, in rank order",
+          "kinds": [
+            "image"
+          ],
+          "roles": [
+            "character.collectible"
+          ],
+          "recipes": [
+            "square",
+            "thumbnail_square"
+          ],
+          "min": 0,
+          "max": 10,
+          "hint": "Optional, but all ten or none. Square images in rank order: image 1 shows for the first 10% of a goal's track, image 10 for the last. A character carries goals only once all ten are present."
+        },
+        {
           "id": "default_sound",
           "label": "Signature sound",
           "kinds": [
@@ -161,6 +178,7 @@
   },
   "requiredRecipes": [
     "portrait_3x4",
+    "square",
     "stamp_4x3",
     "thumbnail_square",
     "tile_16x9"

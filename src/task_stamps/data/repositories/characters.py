@@ -4,7 +4,12 @@ import sqlite3
 from datetime import date, datetime
 
 from task_stamps.data.repositories.base import BaseRepository
-from task_stamps.domain.enums import STAMPS_PER_CHARACTER, CharacterStatus, PoolType
+from task_stamps.domain.enums import (
+    GOAL_SECTIONS,
+    STAMPS_PER_CHARACTER,
+    CharacterStatus,
+    PoolType,
+)
 from task_stamps.domain.models import Character, CharacterStamp
 from task_stamps.utilities.ids import new_id
 
@@ -182,6 +187,66 @@ class CharacterRepository(BaseRepository):
             (character_id,),
         )
         return int(row["n"]) if row else 0
+
+    # -- goal images -----------------------------------------------------
+
+    def goal_images_for(self, character_id: str) -> dict[int, str]:
+        """rank -> image version id, for the ranks that have art."""
+        return {
+            row["rank"]: row["image_asset_version_id"]
+            for row in self.db.query_all(
+                "SELECT rank, image_asset_version_id FROM character_goal_images "
+                "WHERE character_id = ?",
+                (character_id,),
+            )
+        }
+
+    def goal_image(self, character_id: str, rank: int) -> str | None:
+        row = self.db.query_one(
+            "SELECT image_asset_version_id FROM character_goal_images "
+            "WHERE character_id = ? AND rank = ?",
+            (character_id, rank),
+        )
+        return row["image_asset_version_id"] if row else None
+
+    def set_goal_image(
+        self, character_id: str, rank: int, image_asset_version_id: str | None
+    ) -> None:
+        if image_asset_version_id is None:
+            self.db.execute(
+                "DELETE FROM character_goal_images WHERE character_id = ? AND rank = ?",
+                (character_id, rank),
+            )
+            return
+        self.db.execute(
+            "INSERT INTO character_goal_images(character_id, rank, image_asset_version_id, "
+            "updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(character_id, rank) DO UPDATE SET "
+            "image_asset_version_id = excluded.image_asset_version_id, "
+            "updated_at = excluded.updated_at",
+            (character_id, rank, image_asset_version_id, self.now_iso()),
+        )
+
+    def goal_eligible_character_ids(
+        self, pool_type: PoolType, world_id: str | None
+    ) -> list[str]:
+        """Characters with all ten goal images, unarchived, in an unarchived
+        world, and not carrying another goal. Holding a task does not count:
+        goals and tasks show different art."""
+        sql = """
+            SELECT c.id FROM characters c
+            JOIN worlds w ON w.id = c.world_id AND w.is_archived = 0
+            WHERE c.is_archived = 0
+              AND (SELECT COUNT(*) FROM character_goal_images g
+                   WHERE g.character_id = c.id) = ?
+              AND NOT EXISTS (SELECT 1 FROM goal_legs l
+                              WHERE l.character_id = c.id AND l.is_active = 1)
+        """
+        params: list[object] = [GOAL_SECTIONS]
+        if pool_type == PoolType.SPECIFIC_WORLD:
+            sql += " AND c.world_id = ?"
+            params.append(world_id)
+        sql += " ORDER BY c.id"
+        return [row["id"] for row in self.db.query_all(sql, params)]
 
     # -- eligibility -----------------------------------------------------
 

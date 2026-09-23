@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Iterable
 
 from task_stamps.container import AppContainer
-from task_stamps.domain.enums import STAMPS_PER_CHARACTER, PoolType, TaskWeight
+from task_stamps.domain.enums import (
+    GOAL_SECTIONS,
+    STAMPS_PER_CHARACTER,
+    PoolType,
+    TaskWeight,
+)
 from task_stamps.domain.models import Character, HabitTask, World
 from task_stamps.services.completion_service import CompletionResult
 from task_stamps.utilities.clock import FixedClock
@@ -49,6 +54,29 @@ def make_character(
         render_stamp_png(stamp_file, sequence, (160, 170, 150), width=32, height=24)
         library.import_stamp_image(character.id, sequence, stamp_file)
     return container.characters.get(character.id)
+
+
+def add_goal_images(
+    container: AppContainer,
+    character_id: str,
+    source_dir: Path,
+    count: int = GOAL_SECTIONS,
+) -> None:
+    """Give a character ``count`` square goal images, ranks 1..count."""
+    for rank in range(1, count + 1):
+        image = source_dir / f"{character_id}_goal_{rank}.png"
+        render_portrait_png(image, (120, 140, 90), width=24, height=24)
+        container.library_service.import_goal_image(character_id, rank, image)
+
+
+def make_goal_character(
+    container: AppContainer, world_id: str, name: str, source_dir: Path
+) -> Character:
+    """A character with a portrait and all ten goal images but no stamps: goal
+    art is independent of task readiness."""
+    character = make_character(container, world_id, name, source_dir, stamp_count=0)
+    add_goal_images(container, character.id, source_dir)
+    return character
 
 
 def make_task(

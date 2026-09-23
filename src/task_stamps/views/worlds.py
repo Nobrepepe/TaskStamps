@@ -7,6 +7,7 @@ import flet as ft
 from task_stamps.components.common import (
     confirm_dialog,
     bleeding_image,
+    goal_image,
     portrait_image,
     progress_run,
     section_title,
@@ -17,6 +18,7 @@ from task_stamps.components.theme import (
     eyebrow, hairline, style_dialog, text_action,
 )
 from task_stamps.domain.enums import (
+    GOAL_SECTIONS,
     STAMPS_PER_CHARACTER,
     CharacterStatus,
 )
@@ -350,6 +352,15 @@ class WorldsView(View):
                     f"{progress.current_streak}"
                 )
 
+        goal_line = "Not carrying a goal."
+        goal_leg = container.goals.active_leg_for_character(character_id)
+        if goal_leg is not None:
+            goal_view = container.goal_service.view(goal_leg.goal_id)
+            goal_line = (
+                f"Carrying the goal '{goal_view.goal.name}' — section "
+                f"{goal_view.section} of {GOAL_SECTIONS}"
+            )
+
         next_preview: ft.Control = ft.Text("—", color=MUTED)
         if progress.next_stamp_number and progress.assignment and progress.assignment.is_active:
             next_stamp = stamps[progress.next_stamp_number - 1]
@@ -435,8 +446,14 @@ class WorldsView(View):
                 ft.Text(world.name, size=14, color=MUTED),
                 ft.Text(character.description, size=14, color=MUTED),
                 ft.Text(assignment_line, size=14),
+                ft.Text(goal_line, size=14, color=TEXT_DIM),
                 section_title("Boss banner media"),
                 self._boss_media_controls(
+                    character_id,
+                    lambda: (self.app.close_dialog(dialog), self._open_profile(character_id)),
+                ),
+                section_title("Goal images"),
+                self._goal_media_controls(
                     character_id,
                     lambda: (self.app.close_dialog(dialog), self._open_profile(character_id)),
                 ),
@@ -668,6 +685,44 @@ class WorldsView(View):
             ft.Row(actions, wrap=True, spacing=6),
         ], spacing=8)
 
+    def _goal_media_controls(self, character_id: str, rebuild) -> ft.Control:
+        """Ten square goal images in rank order. Like Boss media they stay
+        editable in Hub mode; clicking a rank imports or replaces its art."""
+        library = self.app.container.library_service
+        images = self.app.container.characters.goal_images_for(character_id)
+
+        def pick(rank: int) -> None:
+            self.app.pick_file(
+                _IMAGE_EXTS,
+                lambda path: self._safe(
+                    lambda: library.import_goal_image(character_id, rank, path), rebuild
+                ),
+            )
+
+        slots: list[ft.Control] = []
+        for rank in range(1, GOAL_SECTIONS + 1):
+            has_art = rank in images
+            slots.append(ft.Container(
+                content=ft.Column([
+                    goal_image(self.app.img_src(images.get(rank)), 50, glow=False),
+                    ft.Text(str(rank), size=11, color=MUTED if has_art else MUTED_2),
+                ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                opacity=1.0 if has_art else 0.5,
+                ink=True,
+                on_click=lambda _, r=rank: pick(r),
+                tooltip=f"{'Replace' if has_art else 'Import'} goal image {rank}",
+            ))
+        missing = GOAL_SECTIONS - len(images)
+        status = (
+            "All ten present — this character can carry goals."
+            if not missing
+            else f"{missing} of ten still missing — goals only draw characters with all ten."
+        )
+        return ft.Column([
+            ft.Row(slots, spacing=4, wrap=True),
+            ft.Text(status, size=12.5, color=TEXT_DIM),
+        ], spacing=8)
+
     def _open_editor(self, character_id: str) -> None:
         container = self.app.container
         content_host = ft.Container(width=760, height=680)
@@ -801,6 +856,8 @@ class WorldsView(View):
             [
                 header,
                 self._boss_media_controls(character_id, rebuild),
+                section_title("Goal images (ten, square, in rank order)"),
+                self._goal_media_controls(character_id, rebuild),
                 readiness,
                 section_title("Stamps (15 required, landscape 4:3)"),
                 stamp_grid,

@@ -7,6 +7,7 @@ from task_stamps.data.migrations.m0004_worldhub import SQL as M0004
 from task_stamps.data.migrations.m0005_dark_board import SQL as M0005
 from task_stamps.data.migrations.m0006_daily_boss import SQL as M0006
 from task_stamps.data.migrations.m0007_vice_chests import SQL as M0007
+from task_stamps.data.migrations.m0008_goals import SQL as M0008
 
 MIGRATIONS: list[tuple[int, str]] = [
     (1, M0001),
@@ -16,6 +17,7 @@ MIGRATIONS: list[tuple[int, str]] = [
     (5, M0005),
     (6, M0006),
     (7, M0007),
+    (8, M0008),
 ]
 
 SCHEMA_VERSION: int = MIGRATIONS[-1][0]

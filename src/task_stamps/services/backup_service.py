@@ -38,6 +38,10 @@ _EXPORT_TABLES = (
     "vice_rewards",
     "vice_chests",
     "task_misses",
+    "character_goal_images",
+    "goals",
+    "goal_legs",
+    "goal_entries",
 )
 
 

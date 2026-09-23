@@ -19,6 +19,7 @@ _REFERENCING_COLUMNS: tuple[tuple[str, str], ...] = (
     ("characters", "default_sound_asset_version_id"),
     ("character_stamps", "image_asset_version_id"),
     ("character_stamps", "sound_asset_version_id"),
+    ("character_goal_images", "image_asset_version_id"),
     ("stamp_placements", "image_asset_version_id"),
     ("stamp_placements", "sound_asset_version_id"),
     ("daily_bosses", "image_asset_version_id"),

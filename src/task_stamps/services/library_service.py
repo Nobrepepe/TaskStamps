@@ -10,6 +10,7 @@ from task_stamps.data.repositories.characters import CharacterRepository
 from task_stamps.data.repositories.tasks import TaskRepository
 from task_stamps.data.repositories.worlds import WorldRepository
 from task_stamps.domain.enums import (
+    GOAL_SECTIONS,
     STAMPS_PER_CHARACTER,
     AssetType,
     AssignmentEndReason,
@@ -25,6 +26,7 @@ from task_stamps.domain.exceptions import (
 from task_stamps.domain.models import Character, World
 from task_stamps.services.asset_service import AssetService
 from task_stamps.services.assignment_service import AssignmentService
+from task_stamps.services.goal_service import GoalService
 from task_stamps.utilities.clock import Clock
 from task_stamps.utilities.logging_setup import get_logger
 
@@ -42,6 +44,7 @@ class LibraryService:
         assignments: AssignmentRepository,
         assets: AssetService,
         assignment_service: AssignmentService,
+        goal_service: GoalService,
     ) -> None:
         self.db = db
         self.clock = clock
@@ -51,6 +54,7 @@ class LibraryService:
         self.assignments = assignments
         self.assets = assets
         self.assignment_service = assignment_service
+        self.goal_service = goal_service
 
     # -- worlds ------------------------------------------------------------
 
@@ -77,6 +81,8 @@ class LibraryService:
         for character in self.characters.list(world_id=world_id, include_archived=True):
             if self.assignments.active_for_character(character.id) is not None:
                 return True
+            if self.goal_service.goals.active_leg_for_character(character.id) is not None:
+                return True
         return False
 
     def archive_world(self, world_id: str, confirmed: bool = False) -> None:
@@ -87,11 +93,12 @@ class LibraryService:
             if self.world_has_active_assignments(world_id):
                 if not confirmed:
                     raise WorldArchiveError(
-                        "This world has characters assigned to active tasks. "
-                        "Confirm to archive it and reassign those tasks."
+                        "This world has characters carrying active tasks or goals. "
+                        "Confirm to archive it and reassign them."
                     )
             self.worlds.set_archived(world_id, True)
             for character in self.characters.list(world_id=world_id):
+                self.goal_service.release_character(character.id)
                 assignment = self.assignments.active_for_character(character.id)
                 if assignment is None:
                     continue
@@ -215,6 +222,27 @@ class LibraryService:
     def remove_stamp_sound(self, character_id: str, sequence: int) -> None:
         self.characters.set_stamp_sound(character_id, sequence, None)
 
+    def import_goal_image(self, character_id: str, rank: int, source: Path | str) -> None:
+        if not 1 <= rank <= GOAL_SECTIONS:
+            raise ValidationError(f"Goal image rank {rank} does not exist.")
+        with self.db.transaction():
+            self.characters.get(character_id)  # must exist
+            version = self.assets.replace_version(
+                self.characters.goal_image(character_id, rank), source, AssetType.GOAL_IMAGE
+            )
+            self.characters.set_goal_image(character_id, rank, version.id)
+
+    def clear_goal_image(self, character_id: str, rank: int) -> None:
+        """Blocked while the character carries a goal — the goal would lose
+        the art for one of its sections."""
+        with self.db.transaction():
+            if self.goal_service.goals.active_leg_for_character(character_id) is not None:
+                raise CharacterEditError(
+                    "This character is carrying a goal. Its goal images cannot be "
+                    "removed (replacing them is allowed)."
+                )
+            self.characters.set_goal_image(character_id, rank, None)
+
     def refresh_readiness(self, character_id: str) -> Character:
         """Ready = named, valid world, all 15 stamp images present."""
         character = self.characters.get(character_id)
@@ -240,7 +268,14 @@ class LibraryService:
                     "This character is assigned to an active task. Confirm to "
                     "archive it and reassign the task."
                 )
+            carrying_goal = self.goal_service.goals.active_leg_for_character(character_id)
+            if carrying_goal is not None and not confirmed:
+                raise CharacterEditError(
+                    "This character is carrying a goal. Confirm to archive it and "
+                    "hand the goal to someone else."
+                )
             self.characters.set_archived(character_id, True)
+            self.goal_service.release_character(character_id)
             if assignment is not None:
                 self._end_and_replace(
                     assignment.task_id,

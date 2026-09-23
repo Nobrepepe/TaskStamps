@@ -28,6 +28,15 @@ class NoEligibleCharacterError(TaskStampsError):
         self.pool_description = pool_description
 
 
+class NoGoalCharacterError(TaskStampsError):
+    def __init__(self, pool_description: str) -> None:
+        super().__init__(
+            f"No character in {pool_description} is free to carry a goal. A goal "
+            "character needs all ten goal images, and carries one goal at a time."
+        )
+        self.pool_description = pool_description
+
+
 class TaskNotActiveError(TaskStampsError):
     def __init__(self) -> None:
         super().__init__("This task is not active, so it cannot be completed.")

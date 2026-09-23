@@ -28,6 +28,7 @@ _IMAGE_TYPES = {
     AssetType.PORTRAIT,
     AssetType.BOSS_IMAGE,
     AssetType.STAMP_IMAGE,
+    AssetType.GOAL_IMAGE,
 }
 
 _IMAGE_EXTENSIONS = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
@@ -38,6 +39,7 @@ _SUBDIR_BY_TYPE = {
     AssetType.PORTRAIT: "characters",
     AssetType.BOSS_IMAGE: "bosses",
     AssetType.STAMP_IMAGE: "stamps",
+    AssetType.GOAL_IMAGE: "goals",
     AssetType.SOUND: "sounds",
 }
 

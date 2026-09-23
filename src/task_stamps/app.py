@@ -18,6 +18,7 @@ from task_stamps.components.theme import (
     MUTED,
     MUTED_2,
     SANS,
+    SANS_MEDIUM,
     SERIF,
     TEXT,
     eyebrow,
@@ -28,6 +29,7 @@ from task_stamps.container import AppContainer, build_container
 from task_stamps.domain.exceptions import TaskStampsError
 from task_stamps.utilities.logging_setup import get_logger
 from task_stamps.views.calendar import CalendarView, open_history_board_dialog
+from task_stamps.views.goals import GoalsView
 from task_stamps.views.settings import SettingsView
 from task_stamps.views.stats import StatsView
 from task_stamps.views.tasks import TasksView
@@ -38,6 +40,11 @@ from task_stamps.views.worlds import WorldsView
 logger = get_logger("app")
 
 RAIL_WIDTH = 178
+
+NAV_LABELS = (
+    "Today", "Tasks", "Goals", "Calendar", "Stats", "Worlds", "Vice Chests", "Settings",
+)
+GOALS_INDEX = NAV_LABELS.index("Goals")
 
 
 class TaskStampsApp:
@@ -69,15 +76,7 @@ class TaskStampsApp:
         page.overlay.append(self.file_picker)
         self._dialog_stack: list[ft.AlertDialog] = []
 
-        self.views = [
-            TodayView(self),
-            TasksView(self),
-            CalendarView(self),
-            StatsView(self),
-            WorldsView(self),
-            ViceChestsView(self),
-            SettingsView(self),
-        ]
+        self.views = self._make_views()
         self.current_index = 0
         self.content_host = ft.Container(expand=True)
 
@@ -141,21 +140,39 @@ class TaskStampsApp:
                     )
                 self.refresh_current()
 
+    def _make_views(self) -> list:
+        """One view per rail label, in NAV_LABELS order."""
+        return [
+            TodayView(self),
+            TasksView(self),
+            GoalsView(self),
+            CalendarView(self),
+            StatsView(self),
+            WorldsView(self),
+            ViceChestsView(self),
+            SettingsView(self),
+        ]
+
     def _on_resized(self, _event: ft.ControlEvent) -> None:
         # Keep the current screen; just let it re-fit its layout.
         self.views[self.current_index].on_resize()
 
     def _build_rail(self) -> ft.Container:
-        labels = ("Today", "Tasks", "Calendar", "Stats", "Worlds", "Vice Chests", "Settings")
         self.nav_items: list[tuple[ft.Text, ft.Container]] = []
         controls: list[ft.Control] = []
-        for index, label in enumerate(labels):
+        # Reviews due, beside the Goals label; hidden while there are none.
+        self.goal_badge = ft.Text("", size=11, color=ACCENT, font_family=SANS_MEDIUM, visible=False)
+        for index, label in enumerate(NAV_LABELS):
             label_control = eyebrow(label, TEXT if index == 0 else MUTED_2)
             thread = ft.Container(width=2, height=13, bgcolor=ACCENT, left=-26, visible=index == 0)
+            shown: ft.Control = label_control
+            if index == GOALS_INDEX:
+                shown = ft.Row([label_control, self.goal_badge], spacing=8,
+                               vertical_alignment=ft.CrossAxisAlignment.CENTER)
             item = ft.Container(
                 padding=ft.padding.symmetric(horizontal=26, vertical=9),
                 ink=True,
-                content=ft.Stack([label_control, thread], height=15),
+                content=ft.Stack([shown, thread], height=15),
                 on_click=lambda _, i=index: self._show_view(i),
             )
 
@@ -208,6 +225,7 @@ class TaskStampsApp:
             label.spans[0].style.color = TEXT if active else MUTED_2
             thread.visible = active
         self.refresh_chest_count(update=False)
+        self.refresh_goal_count(update=False)
         view = self.views[index]
         if not hasattr(view, "_root_control"):
             view._root_control = view.build()  # type: ignore[attr-defined]
@@ -223,17 +241,16 @@ class TaskStampsApp:
         if update and self.chest_value.page is not None:
             self.chest_value.update()
 
+    def refresh_goal_count(self, *, update: bool = True) -> None:
+        due = self.container.goal_service.reviews_due_count()
+        self.goal_badge.value = str(due)
+        self.goal_badge.visible = due > 0
+        if update and self.goal_badge.page is not None:
+            self.goal_badge.update()
+
     def show_fresh_start(self) -> None:
         """Discard cached view state and return to the empty Today screen."""
-        self.views = [
-            TodayView(self),
-            TasksView(self),
-            CalendarView(self),
-            StatsView(self),
-            WorldsView(self),
-            ViceChestsView(self),
-            SettingsView(self),
-        ]
+        self.views = self._make_views()
         self._show_view(0)
 
     # -- shared helpers ---------------------------------------------------------

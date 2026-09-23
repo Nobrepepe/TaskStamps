@@ -37,7 +37,8 @@ class ViceChestsView(View):
                 ft.Text("Reaching streak 5, 10 or 15 on a Minor, Medium or Major task drops one "
                         "chest onto a random reward from that slot. Trivial tasks earn stamps only. "
                         "Defeating the daily Boss rolls one reward across all nine slots and "
-                        "drops a chest on that — the harder the reward, the rarer it rolls.",
+                        "drops a chest on that — the harder the reward, the rarer it rolls. "
+                        "Reaching a goal drops a chest on the reward you picked for it.",
                         size=13, color=MUTED_2, width=580)], spacing=32, scroll=ft.ScrollMode.AUTO),
             padding=ft.padding.only(left=56, right=56, top=40, bottom=72), expand=True,
         )

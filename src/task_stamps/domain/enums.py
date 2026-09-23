@@ -6,6 +6,12 @@ from enum import StrEnum
 
 STAMPS_PER_CHARACTER = 15
 
+#: A goal track is cut into ten 10% sections, one ranked goal image each.
+GOAL_SECTIONS = 10
+
+#: Days between goal reviews; any logged entry restarts the count.
+GOAL_REVIEW_DAYS = 7
+
 
 class TaskStatus(StrEnum):
     DRAFT = "draft"
@@ -24,6 +30,26 @@ class TaskWeight(StrEnum):
 class ChestSource(StrEnum):
     STREAK = "streak"
     BOSS = "boss"
+    GOAL = "goal"
+
+
+class GoalStatus(StrEnum):
+    ACTIVE = "active"
+    REACHED = "reached"  # target met; waiting for extend or finish
+    FINISHED = "finished"
+    REMOVED = "removed"
+
+
+class GoalLegEndReason(StrEnum):
+    REACHED = "reached"
+    REBASED = "rebased"
+    REMOVED = "removed"
+
+
+class GoalEntryOutcome(StrEnum):
+    PROGRESS = "progress"
+    REACHED = "reached"
+    REBASED = "rebased"
 
 
 #: Streak milestones inside a character run that hand out a chest.
@@ -57,6 +83,7 @@ class AssetType(StrEnum):
     PORTRAIT = "portrait"
     BOSS_IMAGE = "boss_image"
     STAMP_IMAGE = "stamp_image"
+    GOAL_IMAGE = "goal_image"
     SOUND = "sound"
 
 

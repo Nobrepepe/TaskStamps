@@ -17,7 +17,7 @@ from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from task_stamps.domain.enums import AssetType, CharacterStatus
+from task_stamps.domain.enums import GOAL_SECTIONS, AssetType, CharacterStatus
 from task_stamps.utilities.logging_setup import get_logger
 from worldhub_kit import (
     PackageError,
@@ -209,6 +209,10 @@ class WorldHubService:
                 raise PackageError("A character has more than one Boss image.")
             if len(asset_sets.get(f"boss_sound:{character_id}") or []) > 1:
                 raise PackageError("A character has more than one Boss defeat sound.")
+            if len(asset_sets.get(f"goal_images:{character_id}") or []) not in (0, GOAL_SECTIONS):
+                raise PackageError(
+                    "A character has some goal images but not all ten; the package was refused."
+                )
             for sound in asset_sets.get(f"stamp_sounds:{character_id}") or []:
                 number = (sound.get("values") or {}).get("stamp_number")
                 if not isinstance(number, int) or not 1 <= number <= 15:
@@ -389,6 +393,18 @@ class WorldHubService:
                     package.recipes_for("stamps"),
                 )
                 self.characters.set_stamp_image(local_id, index, version.id)
+
+            # Goal images arrive all ten or none. With none, whatever was
+            # imported locally stays, the same as Boss media.
+            goal_items = asset_sets.get(f"goal_images:{hub_character_id}") or []
+            for rank, item in enumerate(goal_items, start=1):
+                version = self._import_hub_asset(
+                    package,
+                    item["assetId"],
+                    AssetType.GOAL_IMAGE,
+                    package.recipes_for("goal_images"),
+                )
+                self.characters.set_goal_image(local_id, rank, version.id)
 
             for item in asset_sets.get(f"stamp_sounds:{hub_character_id}") or []:
                 number = (item.get("values") or {}).get("stamp_number")

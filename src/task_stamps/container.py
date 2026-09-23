@@ -17,6 +17,7 @@ from task_stamps.data.repositories.state import AppStateRepository
 from task_stamps.data.repositories.tasks import TaskRepository
 from task_stamps.data.repositories.worlds import WorldRepository
 from task_stamps.data.repositories.chests import ChestRepository
+from task_stamps.data.repositories.goals import GoalRepository
 from task_stamps.data.repositories.misses import MissRepository
 from task_stamps.services.asset_service import AssetService
 from task_stamps.services.assignment_service import AssignmentService
@@ -25,6 +26,7 @@ from task_stamps.services.board_service import BoardService
 from task_stamps.services.boss_service import BossService
 from task_stamps.services.chest_service import ChestService
 from task_stamps.services.completion_service import CompletionService
+from task_stamps.services.goal_service import GoalService
 from task_stamps.services.library_service import LibraryService
 from task_stamps.services.schedule_service import ScheduleService
 from task_stamps.services.settings_service import SettingsService
@@ -66,6 +68,7 @@ class AppContainer:
         self.state = AppStateRepository(self.db, clock)
         self.chests = ChestRepository(self.db, clock)
         self.misses = MissRepository(self.db, clock)
+        self.goals = GoalRepository(self.db, clock)
 
         # Services
         self.settings_service = SettingsService(self.settings_repo)
@@ -95,6 +98,16 @@ class AppContainer:
             self.settings_service,
         )
         self.chest_service = ChestService(self.db, clock, rng, self.chests)
+        self.goal_service = GoalService(
+            self.db,
+            clock,
+            rng,
+            self.goals,
+            self.characters,
+            self.worlds,
+            self.chests,
+            self.chest_service,
+        )
         self.completion_service = CompletionService(
             self.db,
             clock,
@@ -123,6 +136,7 @@ class AppContainer:
             self.assignments,
             self.asset_service,
             self.assignment_service,
+            self.goal_service,
         )
         self.task_service = TaskService(
             self.db,

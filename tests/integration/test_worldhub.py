@@ -15,7 +15,7 @@ FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "worldhub"
 EXPECTED = json.loads((FIXTURES / "expected.json").read_text())
 
 
-def test_application_contract_advertises_current_asset_recipes_and_optional_boss_media():
+def test_application_contract_advertises_current_asset_recipes_and_optional_media():
     contract_path = Path(__file__).resolve().parents[2] / "worldhub" / "application-contract.json"
     contract = json.loads(contract_path.read_text())
     # contractFormatVersion is the document-format version, and the only
@@ -24,7 +24,7 @@ def test_application_contract_advertises_current_asset_recipes_and_optional_boss
     assert contract["contractFormatVersion"] == 1
     assert 2 in contract["supportedProtocolVersions"]
     assert contract["requiredRecipes"] == [
-        "portrait_3x4", "stamp_4x3", "thumbnail_square", "tile_16x9"
+        "portrait_3x4", "square", "stamp_4x3", "thumbnail_square", "tile_16x9"
     ]
     characters = next(
         selection for selection in contract["entitySelections"]
@@ -37,6 +37,9 @@ def test_application_contract_advertises_current_asset_recipes_and_optional_boss
     assert sets["boss_image"]["min"] == 0 and sets["boss_image"]["max"] == 1
     assert sets["boss_sound"]["kinds"] == ["audio"]
     assert sets["boss_sound"]["min"] == 0 and sets["boss_sound"]["max"] == 1
+    assert sets["goal_images"]["roles"] == ["character.collectible"]
+    assert sets["goal_images"]["recipes"][0] == "square"
+    assert sets["goal_images"]["min"] == 0 and sets["goal_images"]["max"] == 10
 
 
 def install(container, name: str):
@@ -286,3 +289,26 @@ def test_a_nonsense_contract_revision_is_still_refused(tmp_path):
 
     with pytest.raises(PackageError, match="invalid contract revision"):
         load_package(_repackage_manifest(tmp_path, spoil), APP_TYPE)
+
+
+@pytest.mark.parametrize(("goal_images", "accepted"), [(0, True), (3, False), (10, True)])
+def test_goal_images_arrive_all_ten_or_none(container, goal_images, accepted):
+    from types import SimpleNamespace
+
+    item = lambda n: {"assetId": f"a{n}"}  # noqa: E731
+    content = {
+        "selections": {"stamp_worlds": ["w"], "stamp_characters": ["c"]},
+        "assetSets": {
+            "portrait:c": [item(0)],
+            "stamps:c": [item(n) for n in range(15)],
+            "goal_images:c": [item(n) for n in range(goal_images)],
+        },
+    }
+    check = lambda: container.worldhub._semantic_validation(  # noqa: E731
+        SimpleNamespace(content=content)
+    )
+    if accepted:
+        check()
+    else:
+        with pytest.raises(PackageError, match="goal images"):
+            check()

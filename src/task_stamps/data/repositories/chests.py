@@ -30,6 +30,7 @@ def _row_to_chest(row: sqlite3.Row) -> ViceChest:
         reward_name_snapshot=row["reward_name_snapshot"],
         completion_id=row["completion_id"],
         boss_date=opt_date(row["boss_date"]),
+        goal_leg_id=row["goal_leg_id"],
         granted_at=datetime.fromisoformat(row["granted_at"]),
         claimed_at=opt_datetime(row["claimed_at"]),
     )
@@ -135,6 +136,35 @@ class ChestRepository(BaseRepository):
             (chest_id, reward.id, reward.name, day.isoformat(), self.now_iso()),
         )
         return self.get_chest(chest_id)
+
+    def grant_goal_chest(self, reward: ViceReward, goal_leg_id: str) -> ViceChest:
+        """Insert the chest a goal leg earns on reaching its target. The partial
+        unique index on goal_leg_id holds it to one per leg."""
+        chest_id = new_id()
+        self.db.execute(
+            "INSERT INTO vice_chests(id, source, reward_id, reward_name_snapshot, "
+            "goal_leg_id, granted_at) VALUES (?, 'goal', ?, ?, ?, ?)",
+            (chest_id, reward.id, reward.name, goal_leg_id, self.now_iso()),
+        )
+        return self.get_chest(chest_id)
+
+    def chest_for_goal_leg(self, goal_leg_id: str) -> ViceChest | None:
+        row = self.db.query_one(
+            "SELECT * FROM vice_chests WHERE goal_leg_id = ?", (goal_leg_id,)
+        )
+        return _row_to_chest(row) if row else None
+
+    def goal_names_waiting_on(self, reward_id: str) -> list[str]:
+        """Goals still walking toward this reward, which must not vanish from
+        under them."""
+        return [
+            row["name"]
+            for row in self.db.query_all(
+                "SELECT name FROM goals WHERE reward_id = ? AND status = 'active' "
+                "ORDER BY name COLLATE NOCASE",
+                (reward_id,),
+            )
+        ]
 
     def chest_for_completion(self, completion_id: str) -> ViceChest | None:
         row = self.db.query_one(

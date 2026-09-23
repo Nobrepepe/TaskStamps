@@ -118,8 +118,17 @@ class ChestService:
 
     def remove_reward(self, reward_id: str) -> None:
         """Archive a reward that has chest history so past chests keep their
-        name; delete it outright when nothing references it."""
+        name; delete it outright when nothing references it. A reward a goal
+        is still walking toward stays until that goal points elsewhere."""
         with self.db.transaction():
+            waiting = self.chests.goal_names_waiting_on(reward_id)
+            if waiting:
+                names = ", ".join(f"'{name}'" for name in waiting)
+                raise ValidationError(
+                    f"This reward is waiting at the end of {names}. Point "
+                    f"{'that goal' if len(waiting) == 1 else 'those goals'} at "
+                    "another reward first."
+                )
             if self.chests.has_chests(reward_id):
                 self.chests.archive_reward(reward_id)
             else:
@@ -195,7 +204,39 @@ class ChestService:
         weight, tier = weighted_pick(filled, self.rng)
         return self.rng.choice(self.chests.rewards_in_slot(weight, tier))
 
+    def grant_for_goal(self, reward_id: str | None, goal_leg_id: str) -> ViceChest | None:
+        """Drop the chest a goal leg earns onto the goal's chosen reward.
+
+        Idempotent per leg. Returns None when the reward is gone, which the
+        remove_reward guard only lets happen to goals that were never active.
+        """
+        if reward_id is None or self.chests.chest_for_goal_leg(goal_leg_id) is not None:
+            return None
+        try:
+            reward = self.chests.get_reward(reward_id)
+        except KeyError:
+            return None
+        if reward.is_archived:
+            return None
+        chest = self.chests.grant_goal_chest(reward, goal_leg_id)
+        logger.info("Goal leg %s reached; chest granted for %s", goal_leg_id, reward.name)
+        return chest
+
     # -- revocations (undo) ------------------------------------------------
+
+    def revoke_for_goal_leg(self, goal_leg_id: str) -> str | None:
+        """Take back the chest a goal leg earned. Returns the reward name if one
+        was revoked."""
+        chest = self.chests.chest_for_goal_leg(goal_leg_id)
+        if chest is None:
+            return None
+        if chest.is_claimed:
+            raise ValidationError(
+                f"The chest this goal earned ({chest.reward_name_snapshot}) has "
+                "already been claimed, so the entry cannot be undone."
+            )
+        self.chests.delete_chest(chest.id)
+        return chest.reward_name_snapshot
 
     def revoke_for_completion(self, completion_id: str) -> str | None:
         """Take back the chest a completion granted. Returns the reward name if

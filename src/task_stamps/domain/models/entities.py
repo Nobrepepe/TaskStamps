@@ -10,6 +10,9 @@ from task_stamps.domain.enums import (
     AssetType,
     CharacterStatus,
     ChestSource,
+    GoalEntryOutcome,
+    GoalLegEndReason,
+    GoalStatus,
     PoolType,
     TaskStatus,
     TaskWeight,
@@ -169,12 +172,67 @@ class ViceChest:
     reward_name_snapshot: str | None
     completion_id: str | None
     boss_date: date | None
+    goal_leg_id: str | None
     granted_at: datetime
     claimed_at: datetime | None
 
     @property
     def is_claimed(self) -> bool:
         return self.claimed_at is not None
+
+
+@dataclass
+class Goal:
+    """A numeric target. ``baseline_value`` is where the current track starts;
+    it moves when the value slips past it or the path is extended."""
+
+    id: str
+    name: str
+    description: str
+    unit: str
+    baseline_value: float
+    target_value: float
+    current_value: float
+    reward_id: str | None
+    pool_type: PoolType
+    world_id: str | None
+    status: GoalStatus
+    last_reviewed_on: date
+    created_at: datetime
+    updated_at: datetime
+    finished_at: datetime | None
+
+
+@dataclass
+class GoalLeg:
+    """One stretch of a goal's path, from a baseline to a target, carried by
+    one character. A new leg starts on every rebase and every extension."""
+
+    id: str
+    goal_id: str
+    ordinal: int
+    character_id: str | None
+    baseline_value: float
+    target_value: float
+    started_on: date
+    ended_on: date | None
+    end_reason: GoalLegEndReason | None
+    end_value: float | None
+    is_active: bool
+
+
+@dataclass
+class GoalEntry:
+    id: str
+    goal_id: str
+    leg_id: str
+    delta: float
+    value_before: float
+    value_after: float
+    outcome: GoalEntryOutcome
+    previous_reviewed_on: date
+    entered_on: date
+    entered_at: datetime
 
 
 @dataclass

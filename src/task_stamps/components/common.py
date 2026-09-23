@@ -7,6 +7,7 @@ from typing import Callable
 import flet as ft
 
 from task_stamps.components.theme import (
+    ACCENT,
     BAD,
     BG,
     FAINT,
@@ -18,11 +19,12 @@ from task_stamps.components.theme import (
     eyebrow,
     style_dialog,
 )
-from task_stamps.domain.enums import STAMPS_PER_CHARACTER
+from task_stamps.domain.enums import GOAL_SECTIONS, STAMPS_PER_CHARACTER
 
 PORTRAIT_RATIO = 3 / 4
 STAMP_RATIO = 4 / 3
 BOSS_RATIO = 16 / 9
+GOAL_RATIO = 1.0
 
 
 def bleeding_image(
@@ -97,6 +99,25 @@ def portrait_image(src: str | None, width: float | None = 96) -> ft.Control:
 
 def stamp_image(src: str | None, width: float = 96) -> ft.Control:
     return bleeding_image(src, width, STAMP_RATIO, glow=False)
+
+
+def goal_image(src: str | None, width: float | None = 96, *, glow: bool = True) -> ft.Control:
+    return bleeding_image(src, width, GOAL_RATIO, glow=glow)
+
+
+def goal_track(section: int, *, reached: bool = False, width: float = 7) -> ft.Row:
+    """Ten hairline segments: passed sections solid, the current one lit in
+    the accent, the rest faint. A reached track is solid throughout."""
+    controls: list[ft.Control] = []
+    for number in range(1, GOAL_SECTIONS + 1):
+        if reached or number < section:
+            color = TEXT
+        elif number == section:
+            color = ACCENT
+        else:
+            color = "#24f4ece1"
+        controls.append(ft.Container(width=width, height=2, bgcolor=color))
+    return ft.Row(controls, spacing=3)
 
 
 def progress_run(used: set[int], next_number: int | None) -> ft.Row:
